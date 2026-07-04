@@ -1,0 +1,488 @@
+{
+  "name": "2. Deploy Backend",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1376,
+        112
+      ],
+      "id": "e3ab91b1-fc8f-4348-8a2a-fffa273e6a77",
+      "name": "[Trigger] Deployment Entrypoint / [Trigger] Точка входу деплою"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Дані від AI Агента\nconst tool = \"cvat\";\nconst rawProjectName = String($json.project_name || \"test\").toLowerCase();\nconst chatSpace = $json.chat_space || 'unknown';\nconst email = $json.email || 'admin@example.tech'; \n\n// 2. Тип сервера\nconst serverType = String($json.server_type || \"\").toLowerCase().trim();\n\n// Логіни\nconst adminUser = $json.admin_username || \"admin\"; \nconst managerUser = $json.manager_username || \"manager\";\n\n// Паролі\nconst rootPass = $json.root_password;\nconst cvatSuperPass = $json.cvat_superuser_password;\nconst managerPass = $json.manager_password;\n\n// 3. Формування імен\nconst cleanProjectName = rawProjectName\n  .replace(/[^a-z0-9]/g, '-')\n  .replace(/-+/g, '-')\n  .replace(/^-|-$/g, '');\n\nconst serverName = (tool + '-' + cleanProjectName);\nconst zone = 'example.tech'; \nconst fqdn = `${serverName}.${zone}`;\n\n// 4. Webhook URLs\nconst statusWebhookUrl = 'https://your-domain.com/webhook/cvat-status';\nconst finalWebhookUrl = 'https://your-domain.com/webhook/cvat-final-callback';\n\n// 5. Скрипт установки\nconst installScript = `#!/bin/bash\nexport DEBIAN_FRONTEND=noninteractive\nset -e # Зупиняти скрипт при будь-якій помилці\n\n# --- Глобальний обробник помилок (якщо якась команда впаде) ---\ncatch_error() {\n  curl -s -X POST \"${finalWebhookUrl}\" \\\\\n       -H \"Content-Type: application/json\" \\\\\n       -d \"{\\\\\"status\\\\\": \\\\\"failed\\\\\", \\\\\"server_name\\\\\": \\\\\"${serverName}\\\\\", \\\\\"chat_space\\\\\": \\\\\"${chatSpace}\\\\\", \\\\\"message\\\\\": \\\\\"Критична помилка під час виконання інсталяції на рядку \\$1. Деплой зупинено.\\\\\"}\"\n}\ntrap 'catch_error $LINENO' ERR\n\n# --- Функція звітування в Google Chat ---\nsend_status() {\n  curl -s -X POST \"${statusWebhookUrl}\" \\\\\n       -H \"Content-Type: application/json\" \\\\\n       -d \"{\\\\\"message\\\\\": \\\\\"$1\\\\\", \\\\\"chat_space\\\\\": \\\\\"${chatSpace}\\\\\"}\"\n}\n\nsend_status \"🚀 Починаю установку на сервере **${serverName}**. Етап 1/5: Створення користувачів та SSH...\"\n\n# === 1. Користувачі та SSH ===\nuseradd -m -s /bin/bash -G sudo ${adminUser}\necho \"root:${rootPass}\" | chpasswd\necho \"${adminUser}:${rootPass}\" | chpasswd\n\nsed -i 's/^#\\\\?PasswordAuthentication.*/PasswordAuthentication yes/g' /etc/ssh/sshd_config\nsed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config.d/*.conf 2>/dev/null || true\nsystemctl restart ssh\n\nsend_status \"⏳ Етап 2/5: Встановлення та налаштування Zabbix Agent 7.0...\"\n\n# === 2. Оновлення та Zabbix ===\napt-get update\napt-get install -y ca-certificates curl git wget software-properties-common\n\nwget https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_7.0-2+ubuntu24.04_all.deb\ndpkg -i zabbix-release_7.0-2+ubuntu24.04_all.deb\napt-get update\napt-get install -y zabbix-agent\n\n# Налаштування Zabbix (без помилок ServerActive)\ntee /etc/zabbix/zabbix_agentd.conf <<EOF\nPidFile=/run/zabbix/zabbix_agentd.pid\nLogFile=/var/log/zabbix/zabbix_agentd.log\nLogFileSize=0\nServer=192.168.1.100\nServerActive=\nHostname=${serverName}\nEOF\n\nsystemctl daemon-reload\nsystemctl enable zabbix-agent\nsystemctl restart zabbix-agent\n\nsend_status \"⏳ Етап 3/5: Встановлення Docker та клонування CVAT (це займе ~5-10 хв)...\"\n\n# === 3. Установка Docker ===\ninstall -m 0755 -d /etc/apt/keyrings\ncurl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc\nchmod a+r /etc/apt/keyrings/docker.asc\n\n. /etc/os-release\necho \"deb [arch=\\$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \\$VERSION_CODENAME stable\" | tee /etc/apt/sources.list.d/docker.list > /dev/null\n\napt-get update\napt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin\nusermod -aG docker ${adminUser}\n\n# === 4. Установка CVAT ===\nmkdir -p /docker\ncd /docker\ngit clone https://github.com/cvat-ai/cvat\ncd cvat\n\nexport CVAT_HOST=${fqdn}\nexport ACME_EMAIL=${email}\ndocker compose -f docker-compose.yml -f docker-compose.https.yml up -d --build\n\nsend_status \"⏳ Етап 4/5: Контейнери CVAT запущені. Налаштовую Firewall (UFW)...\"\n\n# === 5. Налаштування Firewall (UFW) ===\nufw allow http\nufw allow https\nufw allow from 192.168.1.100\nufw allow from 192.168.1.101\nufw --force enable\n\nsend_status \"⏳ Етап 5/5: Встановлення Fail2Ban та очікування міграцій баз даних...\"\n\n# === 6. Установка та конфігурація Fail2Ban ===\napt-get install -y fail2ban\n\ncat <<EOF > /etc/fail2ban/jail.local\n[DEFAULT]\nbantime = 3600\nfindtime = 600\nmaxretry = 5\n\n[sshd]\nenabled = true\nport = ssh\nfilter = sshd\nlogpath = /var/log/auth.log\nmaxretry = 3\nEOF\n\nsystemctl enable fail2ban\nsystemctl restart fail2ban\n\n# === 7. Очікування готовності та створення суперкористувачів CVAT ===\nfor i in {1..20}; do\n  if docker exec cvat_server python3 manage.py migrate; then\n    break\n  fi\n  sleep 15\ndone\n\ndocker exec cvat_server bash -c \"DJANGO_SUPERUSER_USERNAME=django DJANGO_SUPERUSER_PASSWORD=${cvatSuperPass} DJANGO_SUPERUSER_EMAIL=django@${fqdn} python3 ~/manage.py createsuperuser --noinput\" || true\ndocker exec cvat_server bash -c \"DJANGO_SUPERUSER_USERNAME=${managerUser} DJANGO_SUPERUSER_PASSWORD=${managerPass} DJANGO_SUPERUSER_EMAIL=${email} python3 ~/manage.py createsuperuser --noinput\" || true\n\nsend_status \"✅ Встановлення на ${serverName} завершено успішно! Надсилаю фінальні паролі...\"\n\n# === 8. Фінальний звіт у n8n ===\nSERVER_IP=\\$(hostname -I | awk '{print \\$1}')\ncat <<EOF > /tmp/payload.json\n{\n  \"status\": \"success\",\n  \"ip\": \"\\$SERVER_IP\",\n  \"server_name\": \"${serverName}\",\n  \"url\": \"https://${fqdn}\",\n  \"chat_space\": \"${chatSpace}\",\n  \"admin_username\": \"${adminUser}\",\n  \"root_password\": \"${rootPass}\",\n  \"cvat_superuser\": \"django\",\n  \"cvat_superuser_password\": \"${cvatSuperPass}\",\n  \"manager_username\": \"${managerUser}\",\n  \"manager_password\": \"${managerPass}\"\n}\nEOF\n\ncurl -X POST \"${finalWebhookUrl}\" \\\\\n     -H \"Content-Type: application/json\" \\\\\n     -d @/tmp/payload.json\n`;\n\nconst encodedScript = Buffer.from(installScript).toString('base64');\n\nreturn {\n  subdomain: serverName,\n  serverName: serverName,\n  server_type: serverType, \n  zone_name: zone,\n  hetzner_body: {\n    name: serverName,\n    server_type: serverType, \n    location: \"nbg1\",\n    image: \"ubuntu-24.04\",\n    ssh_keys: [\"My n8n Key\", \"sp-key-1768551665\"], \n    user_data: `#cloud-config\\nssh_pwauth: true\\nwrite_files:\\n  - path: /root/install.sh\\n    permissions: '0755'\\n    encoding: b64\\n    content: ${encodedScript}\\nruncmd:\\n  - /root/install.sh`\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1168,
+        112
+      ],
+      "id": "985ae6e1-907d-4c15-b43b-9b602efd97e2",
+      "name": "Script: Build Provisioning Script / Скрипт: Генерація сценарію розгортання"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hetzner.cloud/v1/servers",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.hetzner_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -928,
+        112
+      ],
+      "id": "1873d1d0-0034-43b3-9702-aaa50b5066e9",
+      "name": "[API] Provision Cloud Compute / [API] Створення хмарного сервера",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Generic_API_Connection"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.cloudflare.com/client/v4/zones",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "cloudflareApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "name",
+              "value": "={{ $('Script: Build Provisioning Script / Скрипт: Генерація сценарію розгортання').item.json.zone_name }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -704,
+        112
+      ],
+      "id": "889d6480-2601-4159-915c-ff2a4466e1ba",
+      "name": "[API] Lookup DNS Zone / [API] Пошук DNS-зони",
+      "credentials": {
+        "cloudflareApi": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Generic_API_Connection"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://api.cloudflare.com/client/v4/zones/{{ $json.result[0].id }}/dns_records",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "cloudflareApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "name",
+              "value": "={{ $('Script: Build Provisioning Script / Скрипт: Генерація сценарію розгортання').item.json.subdomain }}.{{ $('Script: Build Provisioning Script / Скрипт: Генерація сценарію розгортання').item.json.zone_name }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -480,
+        112
+      ],
+      "id": "2cd356e5-a842-4e7d-8d25-7b03e13ba5aa",
+      "name": "[API] Check DNS Inventory / [API] Перевірка DNS-інвентаря",
+      "credentials": {
+        "cloudflareApi": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Generic_API_Connection"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b3e9447e-2e55-472e-8a03-9d41334c2642",
+              "leftValue": "={{ $json.result.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -256,
+        112
+      ],
+      "id": "be46364c-de1a-41e1-a8db-194dbff1e8db",
+      "name": "Route: Update or Create / Route: Оновлення чи Створення"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://api.cloudflare.com/client/v4/zones/{{ $('[API] Lookup DNS Zone / [API] Пошук DNS-зони').item.json.result[0].id }}/dns_records/{{ $('[API] Check DNS Inventory / [API] Перевірка DNS-інвентаря').item.json.result[0].id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "cloudflareApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"type\": \"A\",\n  \"name\": \"{{ $('Script: Build Provisioning Script / Скрипт: Генерація сценарію розгортання').item.json.subdomain }}\",\n  \"content\": \"{{ $('[API] Provision Cloud Compute / [API] Створення хмарного сервера').item.json.server.public_net.ipv4.ip }}\",\n  \"ttl\": 1,\n  \"proxied\": false\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "070d7656-3189-4519-ad03-daa42c078393",
+      "name": "[API] Patch Host Record / [API] Оновлення запису хоста",
+      "credentials": {
+        "cloudflareApi": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Generic_API_Connection"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.cloudflare.com/client/v4/zones/{{ $('[API] Lookup DNS Zone / [API] Пошук DNS-зони').item.json.result[0].id }}/dns_records",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "cloudflareApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"type\": \"A\",\n  \"name\": \"{{ $('Script: Build Provisioning Script / Скрипт: Генерація сценарію розгортання').item.json.subdomain }}\",\n  \"content\": \"{{ $('[API] Provision Cloud Compute / [API] Створення хмарного сервера').item.json.server.public_net.ipv4.ip }}\",\n  \"ttl\": 1,\n  \"proxied\": false\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        224
+      ],
+      "id": "3c34bef6-9f1d-419e-997c-6924f961d379",
+      "name": "[API] Register New Host / [API] Реєстрація нового хоста",
+      "credentials": {
+        "cloudflareApi": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Generic_API_Connection"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "WhLGy7QRGHzeEAoL",
+          "mode": "list",
+          "cachedResultName": "CVAT_Deployments",
+          "cachedResultUrl": "/projects/ilwTuWu3uQzxcrhM/datatables/WhLGy7QRGHzeEAoL"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Project_Name": "={{ $node[\"Script: Build Provisioning Script / Скрипт: Генерація сценарію розгортання\"].json.serverName }}",
+            "URL": "=https://{{ $node[\"Script: Build Provisioning Script / Скрипт: Генерація сценарію розгортання\"].json.subdomain }}.example.tech",
+            "IP_Address": "={{ $node[\"[API] Provision Cloud Compute / [API] Створення хмарного сервера\"].json.server.public_net.ipv4.ip }}",
+            "Status": "Installing",
+            "Server_Root_User": "={{ $node[\"[Trigger] Deployment Entrypoint / [Trigger] Точка входу деплою\"].json.admin_username }}",
+            "Server_Root_Password": "={{ $node[\"[Trigger] Deployment Entrypoint / [Trigger] Точка входу деплою\"].json.root_password }}",
+            "DNS_Rec_ID": "={{ $json.result.id }}",
+            "Server_Type": "={{ $node[\"Script: Build Provisioning Script / Скрипт: Генерація сценарію розгортання\"].json.server_type }}",
+            "CVAT_Superuser": "django",
+            "CVAT_Superuser_Password": "={{ $node[\"[Trigger] Deployment Entrypoint / [Trigger] Точка входу деплою\"].json.cvat_superuser_password }}",
+            "Project_Manager_Login": "={{ $node[\"[Trigger] Deployment Entrypoint / [Trigger] Точка входу деплою\"].json.manager_username }}",
+            "Project_Manager_Password": "={{ $node[\"[Trigger] Deployment Entrypoint / [Trigger] Точка входу деплою\"].json.manager_password }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "URL",
+              "displayName": "URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "IP_Address",
+              "displayName": "IP_Address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Server_Root_User",
+              "displayName": "Server_Root_User",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Server_Root_Password",
+              "displayName": "Server_Root_Password",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "CVAT_Superuser",
+              "displayName": "CVAT_Superuser",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "CVAT_Superuser_Password",
+              "displayName": "CVAT_Superuser_Password",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Project_Manager_Login",
+              "displayName": "Project_Manager_Login",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Project_Manager_Password",
+              "displayName": "Project_Manager_Password",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "DNS_Rec_ID",
+              "displayName": "DNS_Rec_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Project_Name",
+              "displayName": "Project_Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Server_Type",
+              "displayName": "Server_Type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        320,
+        112
+      ],
+      "id": "c236de10-93e9-40fc-a40e-cfa0070ae60a",
+      "name": "[DB] Init Infrastructure Record / [DB] Ініціалізація запису інфраструктури"
+    },
+    {
+      "parameters": {
+        "content": "🏁 Deployment Callback Handler\nОбробка результатів розгортання інфраструктури\n\nTrigger: Webhook (Final Callback) від віддаленого сервера.\n\nVerification: Перевірка JSON-пайлоада на статус success або failed.\n\nDB Update: Автоматичне оновлення інвентарної таблиці CVAT Deployments.\n\nReporting: Надсилання фінальних реквізитів доступу (SSH/Web) у Google Chat.\n\nError Handling: Оповіщення про критичні помилки під час виконання Cloud-Init.",
+        "height": 208,
+        "width": 688
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1200,
+        416
+      ],
+      "typeVersion": 1,
+      "id": "038007ee-8027-4831-b3d7-cd2f4590ab5c",
+      "name": "Sticky Note"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "[Trigger] Deployment Entrypoint / [Trigger] Точка входу деплою": {
+      "main": [
+        [
+          {
+            "node": "Script: Build Provisioning Script / Скрипт: Генерація сценарію розгортання",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Script: Build Provisioning Script / Скрипт: Генерація сценарію розгортання": {
+      "main": [
+        [
+          {
+            "node": "[API] Provision Cloud Compute / [API] Створення хмарного сервера",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[API] Provision Cloud Compute / [API] Створення хмарного сервера": {
+      "main": [
+        [
+          {
+            "node": "[API] Lookup DNS Zone / [API] Пошук DNS-зони",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[API] Lookup DNS Zone / [API] Пошук DNS-зони": {
+      "main": [
+        [
+          {
+            "node": "[API] Check DNS Inventory / [API] Перевірка DNS-інвентаря",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[API] Check DNS Inventory / [API] Перевірка DNS-інвентаря": {
+      "main": [
+        [
+          {
+            "node": "Route: Update or Create / Route: Оновлення чи Створення",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route: Update or Create / Route: Оновлення чи Створення": {
+      "main": [
+        [
+          {
+            "node": "[API] Patch Host Record / [API] Оновлення запису хоста",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "[API] Register New Host / [API] Реєстрація нового хоста",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[API] Patch Host Record / [API] Оновлення запису хоста": {
+      "main": [
+        [
+          {
+            "node": "[DB] Init Infrastructure Record / [DB] Ініціалізація запису інфраструктури",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[API] Register New Host / [API] Реєстрація нового хоста": {
+      "main": [
+        [
+          {
+            "node": "[DB] Init Infrastructure Record / [DB] Ініціалізація запису інфраструктури",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "4cfcab5b-71ce-4660-a157-67ba6fa721eb",
+  "meta": {
+    "instanceId": "YOUR_INSTANCE_ID"
+  },
+  "id": "kgDRJt6BqkH9moZc",
+  "tags": []
+}

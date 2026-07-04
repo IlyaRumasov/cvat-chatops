@@ -1,0 +1,1569 @@
+{
+  "name": "Tool: Hetzner Unified",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "🛠 Hetzner Unified Ops Tool\nУніфікований інструмент операційного керування VM\n\nIntent Routing: Розпізнавання команд (Power, Snapshot, Scaling, Delete).\n\nCompute Ops: Пряма взаємодія з Hetzner Cloud API для керування стейтом серверів.\n\nNetwork Ops: Автоматичне керування DNS-записами (A-records) через Cloudflare API.\n\nLifecycle Management: Повне видалення ресурсів з очищенням інвентарної бази CVAT_Deployments.\n\nComplex Actions: Автоматизація багатоетапних процесів (наприклад, зупинка ➔ зміна типу ➔ запуск).",
+        "height": 208,
+        "width": 848
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1184,
+        608
+      ],
+      "typeVersion": 1,
+      "id": "6fd40ed5-3dd3-45a4-bb6b-97f5d0a1f152",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "query"
+            },
+            {
+              "name": "identifier"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -448,
+        288
+      ],
+      "id": "0fa59792-5740-4ed7-9dbb-91ea0c3ba9d2",
+      "name": "[Trigger] Internal API Entry / [Trigger] Внутрішня точка входу API"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.query }}",
+                    "rightValue": "list_servers",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "0eda3149-08c3-45a8-9ccd-1fe4154cecdb"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.query }}",
+                    "rightValue": "list_types",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "6a3b6fca-2ff6-4bcd-890b-270f2bba87c3"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "0f3fccdd-433d-4d1c-8bab-f8b6343fd77e",
+                    "leftValue": "={{ $json.query }}",
+                    "rightValue": "delete_snapshot",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.query }}",
+                    "rightValue": "reboot",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    },
+                    "id": "bea60489-7ef0-4631-a70c-9379e239e0ae"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "d33c2bd0-6779-4562-b9b7-1fa3f478d284",
+                    "leftValue": "={{ $json.query }}",
+                    "rightValue": "poweron",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "9e6e5b79-5286-494f-8b2b-c34dc94b497a",
+                    "leftValue": "={{ $json.query }}",
+                    "rightValue": "=poweroff",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.query }}",
+                    "rightValue": "create_snapshot",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    },
+                    "id": "6740dc3a-e061-4229-b608-3c3d3dedd9b9"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "ce226c83-6cd0-4f01-888b-9e81bfd390ed",
+                    "leftValue": "={{ $json.query }}",
+                    "rightValue": "list_snapshots",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "dbe5660b-7d4d-4a3b-8d39-8fd10caf459f",
+                    "leftValue": "={{ $json.query }}",
+                    "rightValue": "change_type",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.query }}",
+                    "rightValue": "delete_server",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    },
+                    "id": "bb9ecfff-cc23-4fe2-9d20-2535e9204611"
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -224,
+        160
+      ],
+      "id": "65e13f3f-6958-484c-b9d9-929e6401059b",
+      "name": "Route: Dispatch Operation / Route: Диспетчер операцій"
+    },
+    {
+      "parameters": {
+        "url": "https://api.hetzner.cloud/v1/servers",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "49055453-9c38-44b5-a5f6-bc4e6ed4f410",
+      "name": "[API] Fetch Compute Inventory / [API] Отримання інвентаря серверів",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Generic_API_Connection"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.hetzner.cloud/v1/server_types",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        192
+      ],
+      "id": "f08bf0ff-42e2-4315-884d-1903629c2083",
+      "name": "[API] Fetch SKU Catalog / [API] Отримання каталогу тарифів",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Generic_API_Connection"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.hetzner.cloud/v1/servers",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        576
+      ],
+      "id": "180bda56-af60-40dd-883f-b43458d31bff",
+      "name": "[API] Fetch Active Instances / [API] Отримання активних інстансів",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Generic_API_Connection"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const servers = $json.servers || []; \nconst inputNode = $('[Trigger] Internal API Entry / [Trigger] Внутрішня точка входу API');\n\n// 1. Беремо identifier, якщо він є\nlet target = String(inputNode.item.json.identifier || \"\").trim();\nconst query = String(inputNode.item.json.query || \"\").trim();\n// Розбиваємо запит на частини одразу, бо нам знадобляться слова з нього\nconst parts = query.split(' ');\n\n// 2. Якщо identifier пустий, пробуємо витягти назву з query\nif (!target) {\n  if (parts.length > 1) {\n    // Беремо друге слово (назва сервера)\n    target = parts[1].trim();\n  } else {\n    // Якщо там просто цифри (ID)\n    const extractedId = query.match(/\\d+/);\n    if (extractedId) target = extractedId[0];\n  }\n}\n\n// 3. Шукаємо збіг у списку від Hetzner\nconst match = servers.find(s => \n  String(s.id) === target || \n  s.public_net.ipv4.ip === target || \n  s.name === target\n);\n\n// Якщо сервер не знайдено\nif (!match) {\n  return { \n    error: 'Server not found', \n    searched_for: target,\n    hint: \"Убедитесь, что имя сервера введено правильно после команды\" \n  };\n}\n\n// 4. Визначаємо дію для Action Router1\nlet action = \"unknown\";\nconst q = query.toLowerCase();\n\nif (q.startsWith('reboot')) action = \"reboot\";\nelse if (q.startsWith('create_snapshot')) action = \"create_image\";\nelse if (q.startsWith('poweron')) action = \"poweron\";\nelse if (q.startsWith('poweroff')) action = \"poweroff\";\nelse if (q.startsWith('delete_server')) action = \"delete_server\";\nelse if (q.startsWith('change_type')) action = \"change_type\";\nelse if (q.startsWith('delete_snapshot')) action = \"delete_snapshot\";\nelse if (q.startsWith('list_snapshots')) action = \"list_snapshots\";\n\n// 5. Витягуємо новий тип сервера з команди (наприклад: \"change_type cvat-test15 cpx21\")\nlet newType = \"\";\nif (action === \"change_type\" && parts.length > 2) {\n  newType = parts[2].trim();\n}\n\n// 6. Повертаємо всі зібрані дані\nreturn { \n  id: match.id, \n  action: action, \n  name: match.name,\n  newType: newType // Цей параметр тепер піде в HTTP Request для зміни типу\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        576
+      ],
+      "id": "df654426-244a-4153-9c0e-e2114ab807e4",
+      "name": "Script: Resource Identity Resolver / Скрипт: Визначення ідентифікатора ресурсу"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "reboot",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "bea60489-7ef0-4631-a70c-9379e239e0ae"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "9e6e5b79-5286-494f-8b2b-c34dc94b497a",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "=poweroff",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "d33c2bd0-6779-4562-b9b7-1fa3f478d284",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "poweron",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "create_image",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "6740dc3a-e061-4229-b608-3c3d3dedd9b9"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "cce3d45f-dd93-4c7a-84e2-6a79d60c07d6",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "list_snapshots",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "delete_server",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "bb9ecfff-cc23-4fe2-9d20-2535e9204611"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "7161e4df-572e-4682-8ca8-3cc9b95e1a39",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "change_type",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        448,
+        496
+      ],
+      "id": "77849eec-f5e8-4e21-90cb-6642cd6289f9",
+      "name": "Route: Execute Task Logic / Route: Виконання логіки задачі"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.hetzner.cloud/v1/servers/{{ $node[\"Script: Resource Identity Resolver / Скрипт: Визначення ідентифікатора ресурсу\"].json.id }}/actions/reboot",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        672,
+        0
+      ],
+      "id": "27483c02-7ce5-47a0-b819-c81f05e607a3",
+      "name": "[API] Post Power Reboot / [API] Запит на перезавантаження",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Generic_API_Connection"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const action = $node[\"Route: Execute Task Logic / Route: Виконання логіки задачі\"].json.action;\nconst name = $node[\"Script: Resource Identity Resolver / Скрипт: Визначення ідентифікатора ресурсу\"].json.name;\nreturn {\n  success: true,\n  message: `Команду [${action}] для сервера ${name} успішно відправлено в Hetzner.`,\n  output: `Action ${action} executed`\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        0
+      ],
+      "id": "5e72152c-0629-41e6-954b-4751863ad909",
+      "name": "Transform: Map Reboot Response / Трансформація: Мапінг відповіді перезавантаження"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.hetzner.cloud/v1/servers/{{ $json.id }}/actions/poweroff",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        672,
+        192
+      ],
+      "id": "8feb4724-a91c-4284-961f-734ae00d0824",
+      "name": "[API] Post Power Shutdown / [API] Запит на вимкнення",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Generic_API_Connection"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const action = $node[\"Route: Execute Task Logic / Route: Виконання логіки задачі\"].json.action;\nconst name = $node[\"Script: Resource Identity Resolver / Скрипт: Визначення ідентифікатора ресурсу\"].json.name;\nreturn {\n  success: true,\n  message: `Команду [${action}] для сервера ${name} успішно відправлено в Hetzner.`,\n  output: `Action ${action} executed`\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        192
+      ],
+      "id": "6e9cff68-0821-4390-9dae-b5f1996d1168",
+      "name": "Transform: Map Shutdown Response / Трансформація: Мапінг відповіді вимкнення"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.hetzner.cloud/v1/servers/{{ $json.id }}/actions/poweron",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        672,
+        384
+      ],
+      "id": "42efd0c1-e0cc-437c-b179-43383653bbc1",
+      "name": "[API] Post Power Startup / [API] Запит на увімкнення",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Generic_API_Connection"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const action = $node[\"Route: Execute Task Logic / Route: Виконання логіки задачі\"].json.action;\nconst name = $node[\"Script: Resource Identity Resolver / Скрипт: Визначення ідентифікатора ресурсу\"].json.name;\nreturn {\n  success: true,\n  message: `Команду [${action}] для сервера ${name} успішно відправлено в Hetzner.`,\n  output: `Action ${action} executed`\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        384
+      ],
+      "id": "7ba858a5-52f4-429b-b157-309073b2f784",
+      "name": "Transform: Map Startup Response / Трансформація: Мапінг відповіді увімкнення"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.hetzner.cloud/v1/servers/{{ $json.id }}/actions/create_image",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "=description",
+              "value": "=Snapshot від {{ $now }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        672,
+        576
+      ],
+      "id": "681edffb-37bd-4225-9669-110ecca3a9d9",
+      "name": "[API] Post Image Capture / [API] Запит на створення знімка",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Generic_API_Connection"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://api.hetzner.cloud/v1/images?type=snapshot",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        672,
+        768
+      ],
+      "id": "4ac40b0d-9544-4613-a3eb-e55633d57cb5",
+      "name": "[API] Fetch Image Repository / [API] Отримання репозиторію знімків",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Generic_API_Connection"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const serverName = $node[\"Script: Resource Identity Resolver / Скрипт: Визначення ідентифікатора ресурсу\"].json.name;\nconst snapshotId = $json.action.resources[0].id;\n\nreturn {\n  success: true,\n  message: `Створення Snapshot для сервера ${serverName} розпочато. ID задачі: ${snapshotId}.`,\n  output: `Snapshot started for ${serverName}`\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        576
+      ],
+      "id": "42fabfae-8831-4212-907b-6078927029fd",
+      "name": "Transform: Map Snapshot Response / Трансформація: Мапінг відповіді знімка"
+    },
+    {
+      "parameters": {
+        "jsCode": "const images = $json.images || [];\nconst serverName = $('Script: Resource Identity Resolver / Скрипт: Визначення ідентифікатора ресурсу').first().json.name;\nconst serverId = String($('Script: Resource Identity Resolver / Скрипт: Визначення ідентифікатора ресурсу').first().json.id);\n\n// 1. Шукаємо знімки: або за прив'язкою ID, або за назвою сервера в описі\nconst filteredImages = images.filter(i => \n  String(i.bound_to) === serverId || \n  (i.description && i.description.toLowerCase().includes(serverName.toLowerCase()))\n);\n\n// 2. Якщо для конкретного сервера порожньо, але запит був \"а взагалі які є\"\n// віддаємо весь список (це допоможе Агенту не тупити)\nconst displayList = filteredImages.length > 0 ? filteredImages : images;\n\nif (displayList.length === 0) {\n  return {\n    success: true,\n    message: `📸 Наразі у вашому акаунті Hetzner не знайдено жодного знімка (snapshot).`,\n    output: \"No snapshots found at all\"\n  };\n}\n\nconst list = displayList.map(i => `• **ID: ${i.id}** — ${i.description} (Сервер: ${i.bound_to || 'не вказано'})`).join('\\n');\n\nreturn {\n  success: true,\n  message: filteredImages.length > 0 \n    ? `✅ Знайдені знімки для сервера ${serverName}:\\n${list}`\n    : `📸 Я не знайшов прямих знімків для ${serverName}, але ось список усіх знімків в акаунті:\\n${list}`,\n  output: list\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        768
+      ],
+      "id": "be8a0818-aaa1-43d1-9978-5a916e5f4eb5",
+      "name": "Transform: Format Snapshot List / Трансформація: Форматування списку знімків"
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "=https://api.hetzner.cloud/v1/images/{{ $json.query.match(/\\d+/)[0] }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        0,
+        384
+      ],
+      "id": "7c2f3d4d-60e9-4d11-a363-1a9bf306f150",
+      "name": "[API] Delete Image Asset / [API] Видалення об'єкта знімка",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Generic_API_Connection"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.hetzner.cloud/v1/servers/{{ $('Script: Resource Identity Resolver / Скрипт: Визначення ідентифікатора ресурсу').first().json.id }}/actions/poweroff",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {}
+      },
+      "name": "[API] Shutdown Before Scaling / [API] Вимкнення перед масштабуванням",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        672,
+        1200
+      ],
+      "id": "f2150b1e-e1f3-48d4-ab7a-213dff7cd56c",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Generic_API_Connection"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 60,
+        "unit": "seconds"
+      },
+      "name": "Util: Scaling Delay (Off) / Утиліта: Затримка масштабування (Вимкнення)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        896,
+        1200
+      ],
+      "id": "392d00dd-e9f1-4a6b-8803-40cf77a58c1e",
+      "webhookId": "YOUR_WEBHOOK_ID"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.hetzner.cloud/v1/servers/{{ $('Script: Resource Identity Resolver / Скрипт: Визначення ідентифікатора ресурсу').first().json.id }}/actions/change_type",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "server_type",
+              "value": "={{ $('Script: Resource Identity Resolver / Скрипт: Визначення ідентифікатора ресурсу').first().json.newType }}"
+            },
+            {
+              "name": "upgrade_disk",
+              "value": "false"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "[API] Оновлення тарифного плану",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        1200
+      ],
+      "id": "c8c64595-646f-4428-a0a4-a5c41780c7d7",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Generic_API_Connection"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 90,
+        "unit": "seconds"
+      },
+      "name": "Утиліта: Затримка масштабування (Синхронізація)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        1344,
+        1200
+      ],
+      "id": "1f3c6388-7e25-4c76-a640-eb154eb9ffc2",
+      "webhookId": "YOUR_WEBHOOK_ID"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.hetzner.cloud/v1/servers/{{ $('Script: Resource Identity Resolver / Скрипт: Визначення ідентифікатора ресурсу').first().json.id }}/actions/poweron",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {}
+      },
+      "name": "[API] Startup After Scaling / [API] Запуск після масштабування",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1568,
+        1200
+      ],
+      "id": "cf2c5dac-d6b9-4f2a-ba02-0722dffbc53e",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Generic_API_Connection"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const name = $('Script: Resource Identity Resolver / Скрипт: Визначення ідентифікатора ресурсу').first().json.name;\nconst newType = $('Script: Resource Identity Resolver / Скрипт: Визначення ідентифікатора ресурсу').first().json.newType;\n\nreturn {\n  success: true,\n  message: `✅ Сервер ${name} успішно змінено на тариф ${newType}! Я самостійно вимкнув його, змінив тип і увімкнув назад. Сервер вже працює.`,\n  output: `Type changed to ${newType}`\n};"
+      },
+      "name": "Map Scaling Result / Трансформація: Мапінг результату масштабування",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        1200
+      ],
+      "id": "0a7265a9-b4c3-4fde-aea4-032225d726f1"
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "={{ 'https://api.hetzner.cloud/v1/servers/' + $json.id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        672,
+        960
+      ],
+      "id": "95ab2611-1ced-4560-b3f4-b80cb1850eca",
+      "name": "[API] Terminate Compute Instance / [API] Знищення інстансу сервера",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Generic_API_Connection"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.cloudflare.com/client/v4/zones",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "cloudflareApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "name",
+              "value": "example.tech"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "[API] Lookup Managed Zone / [API] Пошук керованої зони",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        896,
+        960
+      ],
+      "id": "cac5ae1d-6da3-4962-9e6b-b329164060e9",
+      "credentials": {
+        "cloudflareApi": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Generic_API_Connection"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://api.cloudflare.com/client/v4/zones/{{ $json.result[0].id }}/dns_records",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "cloudflareApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "name",
+              "value": "={{ $('Script: Resource Identity Resolver / Скрипт: Визначення ідентифікатора ресурсу').item.json.name }}.example.tech"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "[API] Lookup Host Record / [API] Пошук запису хоста",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        960
+      ],
+      "id": "c0a42cb9-91e3-488b-92fe-96c542415e34",
+      "credentials": {
+        "cloudflareApi": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Generic_API_Connection"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b3e9447e-2e55-472e-8a03-9d41334c2642",
+              "leftValue": "={{ $json.result.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Check: Is Record Present? / Перевірка: Чи присутній запис?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1344,
+        960
+      ],
+      "id": "160cd2f9-a5fc-4435-bbbe-53cc0360c0e3"
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "=https://api.cloudflare.com/client/v4/zones/{{ $('[API] Lookup Managed Zone / [API] Пошук керованої зони').item.json.result[0].id }}/dns_records/{{ $json.result[0].id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "cloudflareApi",
+        "options": {}
+      },
+      "name": "[API] Purge Host Record / [API] Очищення запису хоста",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1568,
+        896
+      ],
+      "id": "6fb03284-c101-469e-ab09-d15bd91cddb4",
+      "credentials": {
+        "cloudflareApi": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Generic_API_Connection"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "WhLGy7QRGHzeEAoL",
+          "mode": "list",
+          "cachedResultName": "CVAT_Deployments",
+          "cachedResultUrl": "/projects/ilwTuWu3uQzxcrhM/datatables/WhLGy7QRGHzeEAoL"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "Project_Name",
+              "keyValue": "={{ $('Script: Resource Identity Resolver / Скрипт: Визначення ідентифікатора ресурсу').first().json.name }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Status": "Deleted"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "URL",
+              "displayName": "URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "IP_Address",
+              "displayName": "IP_Address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Server_Root_User",
+              "displayName": "Server_Root_User",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Server_Root_Password",
+              "displayName": "Server_Root_Password",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "CVAT_Superuser",
+              "displayName": "CVAT_Superuser",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "CVAT_Superuser_Password",
+              "displayName": "CVAT_Superuser_Password",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Project_Manager_Login",
+              "displayName": "Project_Manager_Login",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Project_Manager_Password",
+              "displayName": "Project_Manager_Password",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "DNS_Rec_ID",
+              "displayName": "DNS_Rec_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Project_Name",
+              "displayName": "Project_Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Server_Type",
+              "displayName": "Server_Type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "name": "DB] Mark Record Deleted / [DB] Позначення запису як видаленого",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1792,
+        960
+      ],
+      "id": "2c5cd8d7-fee7-4ef0-8c3a-021b8dee99ff",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Беремо назву сервера з попереднього кроку\nconst serverName = $('Script: Resource Identity Resolver / Скрипт: Визначення ідентифікатора ресурсу').first().json.name;\n\n// Формуємо об'єкт відповіді\nreturn {\n  success: true,\n  message: `Сервер ${serverName} успішно видалено з Hetzner та Cloudflare. Статус у таблиці оновлено на Deleted.`,\n  // Цей параметр допоможе Агенту зрозуміти, що це кінець\n  output: `Success: ${serverName} deleted`\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2016,
+        960
+      ],
+      "id": "9ee7e1c4-3019-4d46-a9b4-cb2530006227",
+      "name": "Transform: Final Deletion Report / Трансформація: Фінальний звіт про видалення"
+    },
+    {
+      "parameters": {
+        "jsCode": "const servers = $json.servers || [];\n\nif (servers.length === 0) {\n  return {\n    success: true,\n    output: \"Наразі у вашому акаунті Hetzner немає активних серверів.\"\n  };\n}\n\n// Формуємо короткий, читабельний маркдаун список для AI\nconst list = servers.map(s => \n  `• **ID:** ${s.id} | **Назва:** ${s.name} | **IP:** ${s.public_net?.ipv4?.ip || 'N/A'} | **Тип:** ${s.server_type?.name || 'N/A'} | **Статус:** ${s.status}`\n).join('\\n');\n\nreturn {\n  success: true,\n  output: `Ось список серверів:\\n\\n${list}`\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        0
+      ],
+      "id": "5009d3ef-7edc-4e45-8820-a60c8ae45ab4",
+      "name": "Transform: Format Server List"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "[Trigger] Internal API Entry / [Trigger] Внутрішня точка входу API": {
+      "main": [
+        [
+          {
+            "node": "Route: Dispatch Operation / Route: Диспетчер операцій",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route: Dispatch Operation / Route: Диспетчер операцій": {
+      "main": [
+        [
+          {
+            "node": "[API] Fetch Compute Inventory / [API] Отримання інвентаря серверів",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "[API] Fetch SKU Catalog / [API] Отримання каталогу тарифів",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "[API] Delete Image Asset / [API] Видалення об'єкта знімка",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "[API] Fetch Active Instances / [API] Отримання активних інстансів",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "[API] Fetch Active Instances / [API] Отримання активних інстансів",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "[API] Fetch Active Instances / [API] Отримання активних інстансів",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "[API] Fetch Active Instances / [API] Отримання активних інстансів",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "[API] Fetch Active Instances / [API] Отримання активних інстансів",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "[API] Fetch Active Instances / [API] Отримання активних інстансів",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "[API] Fetch Active Instances / [API] Отримання активних інстансів",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[API] Fetch Active Instances / [API] Отримання активних інстансів": {
+      "main": [
+        [
+          {
+            "node": "Script: Resource Identity Resolver / Скрипт: Визначення ідентифікатора ресурсу",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Script: Resource Identity Resolver / Скрипт: Визначення ідентифікатора ресурсу": {
+      "main": [
+        [
+          {
+            "node": "Route: Execute Task Logic / Route: Виконання логіки задачі",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route: Execute Task Logic / Route: Виконання логіки задачі": {
+      "main": [
+        [
+          {
+            "node": "[API] Post Power Reboot / [API] Запит на перезавантаження",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "[API] Post Power Shutdown / [API] Запит на вимкнення",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "[API] Post Power Startup / [API] Запит на увімкнення",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "[API] Post Image Capture / [API] Запит на створення знімка",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "[API] Fetch Image Repository / [API] Отримання репозиторію знімків",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "[API] Terminate Compute Instance / [API] Знищення інстансу сервера",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "[API] Shutdown Before Scaling / [API] Вимкнення перед масштабуванням",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[API] Post Power Reboot / [API] Запит на перезавантаження": {
+      "main": [
+        [
+          {
+            "node": "Transform: Map Reboot Response / Трансформація: Мапінг відповіді перезавантаження",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[API] Post Power Shutdown / [API] Запит на вимкнення": {
+      "main": [
+        [
+          {
+            "node": "Transform: Map Shutdown Response / Трансформація: Мапінг відповіді вимкнення",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[API] Post Power Startup / [API] Запит на увімкнення": {
+      "main": [
+        [
+          {
+            "node": "Transform: Map Startup Response / Трансформація: Мапінг відповіді увімкнення",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[API] Post Image Capture / [API] Запит на створення знімка": {
+      "main": [
+        [
+          {
+            "node": "Transform: Map Snapshot Response / Трансформація: Мапінг відповіді знімка",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[API] Fetch Image Repository / [API] Отримання репозиторію знімків": {
+      "main": [
+        [
+          {
+            "node": "Transform: Format Snapshot List / Трансформація: Форматування списку знімків",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[API] Shutdown Before Scaling / [API] Вимкнення перед масштабуванням": {
+      "main": [
+        [
+          {
+            "node": "Util: Scaling Delay (Off) / Утиліта: Затримка масштабування (Вимкнення)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Util: Scaling Delay (Off) / Утиліта: Затримка масштабування (Вимкнення)": {
+      "main": [
+        [
+          {
+            "node": "[API] Оновлення тарифного плану",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[API] Оновлення тарифного плану": {
+      "main": [
+        [
+          {
+            "node": "Утиліта: Затримка масштабування (Синхронізація)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Утиліта: Затримка масштабування (Синхронізація)": {
+      "main": [
+        [
+          {
+            "node": "[API] Startup After Scaling / [API] Запуск після масштабування",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[API] Startup After Scaling / [API] Запуск після масштабування": {
+      "main": [
+        [
+          {
+            "node": "Map Scaling Result / Трансформація: Мапінг результату масштабування",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[API] Terminate Compute Instance / [API] Знищення інстансу сервера": {
+      "main": [
+        [
+          {
+            "node": "[API] Lookup Managed Zone / [API] Пошук керованої зони",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[API] Lookup Managed Zone / [API] Пошук керованої зони": {
+      "main": [
+        [
+          {
+            "node": "[API] Lookup Host Record / [API] Пошук запису хоста",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[API] Lookup Host Record / [API] Пошук запису хоста": {
+      "main": [
+        [
+          {
+            "node": "Check: Is Record Present? / Перевірка: Чи присутній запис?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check: Is Record Present? / Перевірка: Чи присутній запис?": {
+      "main": [
+        [
+          {
+            "node": "[API] Purge Host Record / [API] Очищення запису хоста",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "DB] Mark Record Deleted / [DB] Позначення запису як видаленого",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[API] Purge Host Record / [API] Очищення запису хоста": {
+      "main": [
+        [
+          {
+            "node": "DB] Mark Record Deleted / [DB] Позначення запису як видаленого",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DB] Mark Record Deleted / [DB] Позначення запису як видаленого": {
+      "main": [
+        [
+          {
+            "node": "Transform: Final Deletion Report / Трансформація: Фінальний звіт про видалення",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[API] Fetch Compute Inventory / [API] Отримання інвентаря серверів": {
+      "main": [
+        [
+          {
+            "node": "Transform: Format Server List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "d7b21bc2-6857-43c9-9adf-6fbcdf5cc6e7",
+  "meta": {
+    "instanceId": "YOUR_INSTANCE_ID"
+  },
+  "id": "wbwlfrWUD5Gdi1lT",
+  "tags": []
+}
