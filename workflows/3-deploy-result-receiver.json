@@ -1,0 +1,339 @@
+{
+  "name": "CVAT-BOT | 3. Приймач результату деплою",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "cvat-final-callback",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -448,
+        -176
+      ],
+      "id": "63eb292f-c100-4c4e-94f2-7a3157c72ba8",
+      "name": "Вебхук: результат встановлення",
+      "webhookId": "14f50fa4-5a2f-4d88-bc8c-dadcf580fa06"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3127818e-4f11-432d-947f-856170138914",
+              "leftValue": "={{ $json.body.status }}",
+              "rightValue": "success",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        -176
+      ],
+      "id": "db7b197a-2b28-40a3-b144-218b6a61aa30",
+      "name": "Установка успішна?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://chat.googleapis.com/v1/{{ $('Вебхук: результат встановлення').first().json.body.chat_space }}/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleApi",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "=✅ *Проєкт {{ $('Вебхук: результат встановлення').first().json.body.server_name }} успішно розгорнуто!*\n\n🌐 *URL:* {{ $('Вебхук: результат встановлення').first().json.body.url }}\n🖥 *IP-адреса:* {{ $('Вебхук: результат встановлення').first().json.body.ip }}\n\n🛠 *SSH (доступ лише з офісних IP):*\n👤 *admin1* / 🔑 {{ $('Вебхук: результат встановлення').first().json.body.admin1_password }}\n👤 *admin2* (також вхід за ключем) / 🔑 {{ $('Вебхук: результат встановлення').first().json.body.admin2_password }}\n(root — лише за SSH-ключем)\n\n⚙️ *CVAT (Головний адміністратор):*\n👤 {{ $('Вебхук: результат встановлення').first().json.body.cvat_superuser }} / 🔑 {{ $('Вебхук: результат встановлення').first().json.body.cvat_superuser_password }}\n\n👥 *CVAT (Менеджер проєкту):*\n👤 {{ $('Вебхук: результат встановлення').first().json.body.manager_username }} / 🔑 {{ $('Вебхук: результат встановлення').first().json.body.manager_password }}\n\n⚠️ Збережіть паролі зараз: більше вони ніде не зберігаються."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        448,
+        -272
+      ],
+      "id": "0ed781e4-d135-47bc-b12e-27db4c129a0f",
+      "name": "Чат: надіслати доступи",
+      "credentials": {
+        "googleApi": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Google Service Account CVAT_BOT"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://chat.googleapis.com/v1/{{ $('Вебхук: результат встановлення').first().json.body.chat_space }}/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleApi",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "=❌ *Помилка встановлення {{ $('Вебхук: результат встановлення').first().json.body.server_name }}*\n\n{{ $('Вебхук: результат встановлення').first().json.body.message }}\n\nПотрібно перевірити логи на сервері: /var/log/cloud-init-output.log"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        448,
+        -80
+      ],
+      "id": "b45161d9-b8b5-433e-ad82-d1ce7b1543e3",
+      "name": "Чат: повідомити про збій",
+      "credentials": {
+        "googleApi": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Google Service Account CVAT_BOT"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "content": "## 3. Приймач результату деплою\nНовий сервер після інсталяції (cloud-init) шле POST на /webhook/cvat-final-callback з заголовком X-Webhook-Secret.\n**Успіх:** таблиця → «🟢 On», у чат приходять доступи (admin1, admin2, CVAT-адмін, менеджер). Паролі ніде більше не зберігаються.\n**Помилка:** таблиця → «❌ Failed», у чат — повідомлення з номером рядка скрипта.\nВикликає: сам сервер (зізначення в скрипті у «2. Деплой сервера»). Викликає синхронізацію таблиці.",
+        "height": 240,
+        "width": 656
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -240,
+        208
+      ],
+      "typeVersion": 1,
+      "id": "691847bb-48bb-4e8c-8f22-9210814c2dfa",
+      "name": "Опис флоу"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "secret-check-1",
+              "leftValue": "={{ $json.headers['x-webhook-secret'] }}",
+              "rightValue": "<WEBHOOK_SECRET>",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "5b06583f-22ef-4140-a902-d19ff6fb6d7c",
+      "name": "Перевірка секрету вебхука",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -224,
+        -176
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "<SUBWORKFLOW_ID>",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "mark_name": "={{ $json.body.server_name }}",
+            "mark_state": "🟢 On"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "mark_name",
+              "displayName": "mark_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "mark_state",
+              "displayName": "mark_state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "2b3fcd3e-29fc-4125-9d60-0b41660fb1f7",
+      "name": "Таблиця: позначити On",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        224,
+        -272
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "<SUBWORKFLOW_ID>",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "mark_name": "={{ $json.body.server_name }}",
+            "mark_state": "❌ Failed"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "mark_name",
+              "displayName": "mark_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "mark_state",
+              "displayName": "mark_state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "99c89860-769d-491f-b3fd-faa849a21262",
+      "name": "Таблиця: позначити Failed",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        224,
+        -80
+      ]
+    }
+  ],
+  "connections": {
+    "Вебхук: результат встановлення": {
+      "main": [
+        [
+          {
+            "node": "Перевірка секрету вебхука",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Перевірка секрету вебхука": {
+      "main": [
+        [
+          {
+            "node": "Установка успішна?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Установка успішна?": {
+      "main": [
+        [
+          {
+            "node": "Таблиця: позначити On",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Таблиця: позначити Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Таблиця: позначити On": {
+      "main": [
+        [
+          {
+            "node": "Чат: надіслати доступи",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Таблиця: позначити Failed": {
+      "main": [
+        [
+          {
+            "node": "Чат: повідомити про збій",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true,
+    "saveDataErrorExecution": "none",
+    "saveDataSuccessExecution": "none"
+  }
+}

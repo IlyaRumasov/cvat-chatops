@@ -1,0 +1,2024 @@
+{
+  "name": "CVAT-BOT | Інструмент: Hetzner (основний)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Інструмент: Hetzner (основний)\nВикликається AI-агентом із «1. Чат-агент» як hetzner_manager. Параметри: query, identifier.\nКоманди: list_servers, list_types, poweron/poweroff/reboot, create_snapshot, list_snapshots (без identifier — усі), delete_snapshot, change_type <сервер> <тип>, delete_server, delete_server_no_snapshot.\n**Захисти:** видалення, зміна тарифу та poweroff — лише для cvat-*; перед видаленням і зміною тарифу — автоснепшот (підфлоу «Інструмент: Автоснепшот»), крім delete_server_no_snapshot.\n**Після дій** оновлюється Google-таблиця (флоу «Синхронізація таблиці»). Видалення чистить і DNS-запис у Cloudflare.\nРозширені дії (інфо, метрики, rebuild, firewall, томи...) — в флоу «Інструмент: Hetzner (розширений)».",
+        "height": 308,
+        "width": 792
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1184,
+        608
+      ],
+      "typeVersion": 1,
+      "id": "2912f5a4-b48c-4967-b7fc-bf6ca3a98365",
+      "name": "Опис флоу"
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "query"
+            },
+            {
+              "name": "identifier"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -448,
+        384
+      ],
+      "id": "01df41f7-6497-42dd-9e83-b1f7edc79ba0",
+      "name": "Вхід: команда з агента"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.query }}",
+                    "rightValue": "list_servers",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "0eda3149-08c3-45a8-9ccd-1fe4154cecdb"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.query }}",
+                    "rightValue": "list_types",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "6a3b6fca-2ff6-4bcd-890b-270f2bba87c3"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "0f3fccdd-433d-4d1c-8bab-f8b6343fd77e",
+                    "leftValue": "={{ $json.query }}",
+                    "rightValue": "delete_snapshot",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.query }}",
+                    "rightValue": "reboot",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    },
+                    "id": "bea60489-7ef0-4631-a70c-9379e239e0ae"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "d33c2bd0-6779-4562-b9b7-1fa3f478d284",
+                    "leftValue": "={{ $json.query }}",
+                    "rightValue": "poweron",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "9e6e5b79-5286-494f-8b2b-c34dc94b497a",
+                    "leftValue": "={{ $json.query }}",
+                    "rightValue": "=poweroff",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.query }}",
+                    "rightValue": "create_snapshot",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    },
+                    "id": "6740dc3a-e061-4229-b608-3c3d3dedd9b9"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "ce226c83-6cd0-4f01-888b-9e81bfd390ed",
+                    "leftValue": "={{ $json.query }}",
+                    "rightValue": "list_snapshots",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "dbe5660b-7d4d-4a3b-8d39-8fd10caf459f",
+                    "leftValue": "={{ $json.query }}",
+                    "rightValue": "change_type",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.query }}",
+                    "rightValue": "delete_server",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    },
+                    "id": "bb9ecfff-cc23-4fe2-9d20-2535e9204611"
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -224,
+        256
+      ],
+      "id": "a5b3f679-e6c2-4b96-b3cf-544aa48e2d3b",
+      "name": "Маршрут: тип команди"
+    },
+    {
+      "parameters": {
+        "url": "https://api.hetzner.cloud/v1/servers",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "per_page",
+              "value": "50"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        96
+      ],
+      "id": "6ee9428c-2e7d-4f16-9a34-e351955712a5",
+      "name": "Hetzner: список серверів",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Hetzner Cloud"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "url": "https://api.hetzner.cloud/v1/server_types",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        288
+      ],
+      "id": "e8b9124e-ff12-4d43-ab42-1644cf6c583a",
+      "name": "Hetzner: список тарифів",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Hetzner Cloud"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "url": "https://api.hetzner.cloud/v1/servers",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "per_page",
+              "value": "50"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        672
+      ],
+      "id": "c1000afa-378b-49bd-9160-69757a5a83ba",
+      "name": "Hetzner: знайти сервер",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Hetzner Cloud"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "const servers = $json.servers || [];\nconst inputNode = $('Вхід: команда з агента');\n\n// 1. identifier, якщо є\nlet target = String(inputNode.item.json.identifier || \"\").trim();\nconst query = String(inputNode.item.json.query || \"\").trim();\nconst parts = query.split(' ');\n\n// 2. Якщо identifier пустий — беремо назву з query\nif (!target) {\n  if (parts.length > 1) {\n    target = parts[1].trim();\n  } else {\n    const extractedId = query.match(/\\d+/);\n    if (extractedId) target = extractedId[0];\n  }\n}\n\n// 2b. list_snapshots без сервера — показати знімки всіх серверів\nif (query.toLowerCase().startsWith('list_snapshots') && !target) {\n  return { id: 0, action: 'list_snapshots', name: '(all)', newType: '', skipSnapshot: false };\n}\n\n// 3. Шукаємо збіг у списку від Hetzner\nconst match = servers.find(s =>\n  String(s.id) === target ||\n  s.public_net.ipv4.ip === target ||\n  s.name === target\n);\n\nif (!match) {\n  return {\n    error: \"Сервер не знайдено. Перевірте назву (list_servers).\",\n    searched_for: target\n  };\n}\n\n// 4. Визначаємо дію\nlet action = \"unknown\";\nconst q = query.toLowerCase();\n\nif (q.startsWith('reboot')) action = \"reboot\";\nelse if (q.startsWith('create_snapshot')) action = \"create_image\";\nelse if (q.startsWith('poweron')) action = \"poweron\";\nelse if (q.startsWith('poweroff')) action = \"poweroff\";\nelse if (q.startsWith('delete_server')) action = \"delete_server\";\nelse if (q.startsWith('change_type')) action = \"change_type\";\nelse if (q.startsWith('delete_snapshot')) action = \"delete_snapshot\";\nelse if (q.startsWith('list_snapshots')) action = \"list_snapshots\";\n\n// Без автоснепшота лише для delete_server і лише якщо явно запитано\nconst skipSnapshot = action === 'delete_server' && (q.indexOf('no_snapshot') >= 0 || q.indexOf('without_snapshot') >= 0);\n\n// 5. Захист: деструктивні дії лише для серверів cvat-*\nconst destructive = ['delete_server', 'change_type', 'poweroff'];\nif (destructive.includes(action) && !String(match.name).startsWith('cvat-')) {\n  return {\n    error: \"Заборонено: сервер \" + match.name + \" не є CVAT-сервером (назва має починатися з cvat-). Цю дію виконати не можу.\",\n    searched_for: target\n  };\n}\n\n// 5b. Сервер захищено від видалення в Hetzner — не видаляємо і не робимо зайвий снепшот\nif (action === 'delete_server' && match.protection && match.protection.delete) {\n  return {\n    error: \"Сервер \" + match.name + \" захищено від видалення 🔒. Спочатку зніміть захист (інструмент розширених функцій, дія unprotect), потім повторіть видалення.\",\n    searched_for: target\n  };\n}\n\n// 6. Новий тип для change_type (наприклад: \"change_type cvat-test15 cpx21\")\nlet newType = \"\";\nif (action === \"change_type\" && parts.length > 2) {\n  newType = parts[2].trim();\n}\n\nreturn {\n  id: match.id,\n  action: action,\n  name: match.name,\n  newType: newType,\n  skipSnapshot: skipSnapshot\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        672
+      ],
+      "id": "572e983d-ad95-45d2-8070-46d8fe159b74",
+      "name": "Визначити сервер і дію"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "reboot",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "bea60489-7ef0-4631-a70c-9379e239e0ae"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "9e6e5b79-5286-494f-8b2b-c34dc94b497a",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "=poweroff",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "d33c2bd0-6779-4562-b9b7-1fa3f478d284",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "poweron",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "create_image",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "6740dc3a-e061-4229-b608-3c3d3dedd9b9"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "cce3d45f-dd93-4c7a-84e2-6a79d60c07d6",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "list_snapshots",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "delete_server",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "bb9ecfff-cc23-4fe2-9d20-2535e9204611"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "7161e4df-572e-4682-8ca8-3cc9b95e1a39",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "change_type",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Error / Unknown"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        448,
+        576
+      ],
+      "id": "848fe852-246e-40de-a7e4-21731d3af67e",
+      "name": "Маршрут: дія над сервером"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.hetzner.cloud/v1/servers/{{ $node[\"Визначити сервер і дію\"].json.id }}/actions/reboot",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        672,
+        0
+      ],
+      "id": "f789046f-fe95-47f3-8686-dd7ea1e883f5",
+      "name": "Hetzner: перезавантажити",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Hetzner Cloud"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const action = $node[\"Маршрут: дія над сервером\"].json.action;\nconst name = $node[\"Визначити сервер і дію\"].json.name;\nreturn {\n  success: true,\n  message: `Команду [${action}] для сервера ${name} успішно відправлено в Hetzner.`,\n  output: `Action ${action} executed`\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        0
+      ],
+      "id": "09eaf972-914f-4eac-a0b0-939fc34e6fb9",
+      "name": "Відповідь: перезавантаження"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.hetzner.cloud/v1/servers/{{ $json.id }}/actions/poweroff",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        672,
+        192
+      ],
+      "id": "c6f2ba83-435e-472a-af0c-f9e40ee8b982",
+      "name": "Hetzner: вимкнути",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Hetzner Cloud"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const action = $node[\"Маршрут: дія над сервером\"].json.action;\nconst name = $node[\"Визначити сервер і дію\"].json.name;\nreturn {\n  success: true,\n  message: `Команду [${action}] для сервера ${name} успішно відправлено в Hetzner.`,\n  output: `Action ${action} executed`\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        192
+      ],
+      "id": "96faa240-410a-481f-b971-3c7a4f4c026b",
+      "name": "Відповідь: вимкнення"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.hetzner.cloud/v1/servers/{{ $json.id }}/actions/poweron",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        672,
+        384
+      ],
+      "id": "6b21f579-aa8f-48d0-b81e-082211900615",
+      "name": "Hetzner: увімкнути",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Hetzner Cloud"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const action = $node[\"Маршрут: дія над сервером\"].json.action;\nconst name = $node[\"Визначити сервер і дію\"].json.name;\nreturn {\n  success: true,\n  message: `Команду [${action}] для сервера ${name} успішно відправлено в Hetzner.`,\n  output: `Action ${action} executed`\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        384
+      ],
+      "id": "cde6be43-9ffa-453e-b573-acbee2c50a5a",
+      "name": "Відповідь: увімкнення"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.hetzner.cloud/v1/servers/{{ $json.id }}/actions/create_image",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "description",
+              "value": "={{ 'snapshot-' + $('Визначити сервер і дію').first().json.name + '-' + $now.setZone('Europe/Kyiv').toFormat('yyyy-LL-dd_HH-mm') }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        672,
+        576
+      ],
+      "id": "e3377b18-bd01-48e8-a753-73c871fdedc0",
+      "name": "Hetzner: створити снепшот",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Hetzner Cloud"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.hetzner.cloud/v1/images?type=snapshot&per_page=50",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        672,
+        768
+      ],
+      "id": "80bcf2ed-64a1-4d6a-9f1d-505a802fc9ec",
+      "name": "Hetzner: список снепшотів",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Hetzner Cloud"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "const serverName = $node[\"Визначити сервер і дію\"].json.name;\nconst imageId = ($json.image && $json.image.id) ? $json.image.id : '?';\nconst msg = 'Створення снепшота для сервера ' + serverName + ' розпочато (ID снепшота: ' + imageId + '). Зазвичай це займає 5–15 хвилин; готовність перевірте командою «список снепшотів».';\nreturn { success: true, message: msg, output: msg };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        576
+      ],
+      "id": "21014bc7-72e2-4403-943f-282b1fba75bd",
+      "name": "Відповідь: снепшот створюється"
+    },
+    {
+      "parameters": {
+        "jsCode": "const images = $json.images || [];\nconst resolver = $('Визначити сервер і дію').first().json;\nconst serverName = resolver.name;\nconst serverId = String(resolver.id);\nconst showAll = serverName === '(all)';\n\nconst fmt = i => '• **ID: ' + i.id + '** — ' + (i.description || 'без опису') + ' (сервер: ' + (i.created_from && i.created_from.name ? i.created_from.name : (i.bound_to || 'не вказано')) + ', ' + (i.created || '').slice(0, 10) + ', ' + (i.image_size ? Math.round(i.image_size * 10) / 10 + ' GB' : '?') + ')';\n\nif (images.length === 0) {\n  return {\n    success: true,\n    message: '📸 Наразі у вашому акаунті Hetzner не знайдено жодного знімка (snapshot).',\n    output: 'No snapshots found at all'\n  };\n}\n\nif (showAll) {\n  const list = images.map(fmt).join('\\n');\n  return {\n    success: true,\n    message: '📸 Знімки всіх серверів (' + images.length + '):\\n' + list,\n    output: list\n  };\n}\n\nconst filtered = images.filter(i =>\n  String(i.bound_to) === serverId ||\n  (i.created_from && i.created_from.name === serverName) ||\n  (i.description && i.description.toLowerCase().includes(serverName.toLowerCase()))\n);\n\nif (filtered.length === 0) {\n  return {\n    success: true,\n    message: '📸 Для сервера ' + serverName + ' знімків немає.',\n    output: 'No snapshots for ' + serverName\n  };\n}\n\nconst list = filtered.map(fmt).join('\\n');\nreturn {\n  success: true,\n  message: '✅ Знімки сервера ' + serverName + ' (' + filtered.length + '):\\n' + list,\n  output: list\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        768
+      ],
+      "id": "87530bff-c58d-4699-952f-3ca631e8aec2",
+      "name": "Відповідь: список снепшотів"
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "={{ 'https://api.hetzner.cloud/v1/images/' + (String($json.identifier || '').match(/\\d+/) || String($json.query || '').match(/\\d+/) || [''])[0] }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        0,
+        480
+      ],
+      "id": "f8f2610a-6b35-4726-aee4-d9e64c97df92",
+      "name": "Hetzner: видалити снепшот",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Hetzner Cloud"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.hetzner.cloud/v1/servers/{{ $('Визначити сервер і дію').first().json.id }}/actions/poweroff",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {}
+      },
+      "name": "Hetzner: вимкнути перед зміною тарифу",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        1440
+      ],
+      "id": "9a049288-3b53-4126-a5a3-8c4eb08801ca",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Hetzner Cloud"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 60,
+        "unit": "seconds"
+      },
+      "name": "Чекати 60 с (вимкнення)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        1344,
+        1440
+      ],
+      "id": "e0fc193c-9263-4852-bc45-86f255bf2ecd",
+      "webhookId": "decd6c42-feb8-4338-b66d-8a16cc25714c"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.hetzner.cloud/v1/servers/{{ $('Визначити сервер і дію').first().json.id }}/actions/change_type",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "server_type",
+              "value": "={{ $('Визначити сервер і дію').first().json.newType }}"
+            },
+            {
+              "name": "upgrade_disk",
+              "value": "false"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Hetzner: змінити тариф",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1568,
+        1440
+      ],
+      "id": "d0c8da7e-a1d3-4242-a654-33fb6c7ff329",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Hetzner Cloud"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 90,
+        "unit": "seconds"
+      },
+      "name": "Чекати 90 с (зміна тарифу)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        1792,
+        1440
+      ],
+      "id": "fb999de7-6d32-433c-903b-d53449277f9a",
+      "webhookId": "decd6c42-feb8-4338-b66d-8a16cc25714c"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.hetzner.cloud/v1/servers/{{ $('Визначити сервер і дію').first().json.id }}/actions/poweron",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {}
+      },
+      "name": "Hetzner: увімкнути після зміни тарифу",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2016,
+        1440
+      ],
+      "id": "40dd559f-4184-4513-a2f8-aece92878cb5",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Hetzner Cloud"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const name = $('Визначити сервер і дію').first().json.name;\nconst newType = $('Визначити сервер і дію').first().json.newType;\nconst snap = $('Автоснепшот: перед зміною тарифу').first().json.snapshot_id;\nconst msg = '✅ Сервер ' + name + ' успішно змінено на тариф ' + newType + '. Перед зміною створено автоснепшот (ID ' + snap + '). Я вимкнув сервер, змінив тип і увімкнув назад.';\nreturn { success: true, message: msg, output: msg };"
+      },
+      "name": "Відповідь: тариф змінено",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2464,
+        1440
+      ],
+      "id": "2f8ad61e-5f27-4e73-87a9-f6110aede6a4"
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "={{ 'https://api.hetzner.cloud/v1/servers/' + $('Визначити сервер і дію').first().json.id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1344,
+        992
+      ],
+      "id": "74ec11dc-f582-498a-8deb-7ccb3f9fcaef",
+      "name": "Hetzner: видалити сервер",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Hetzner Cloud"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.cloudflare.com/client/v4/zones",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "cloudflareApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "name",
+              "value": "example.com"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Cloudflare: знайти зону",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1568,
+        992
+      ],
+      "id": "41f0e0a8-9ccb-4636-8200-fdc9f9d96ab2",
+      "credentials": {
+        "cloudflareApi": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Cloudflare account"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "url": "=https://api.cloudflare.com/client/v4/zones/{{ $json.result[0].id }}/dns_records",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "cloudflareApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "name",
+              "value": "={{ $('Визначити сервер і дію').item.json.name }}.example.com"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Cloudflare: знайти DNS-запис",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1792,
+        992
+      ],
+      "id": "8113fe8f-a502-4987-bab2-9e971f3eb25f",
+      "credentials": {
+        "cloudflareApi": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Cloudflare account"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b3e9447e-2e55-472e-8a03-9d41334c2642",
+              "leftValue": "={{ $json.result.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "DNS-запис існує?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2016,
+        992
+      ],
+      "id": "3b11d214-6928-41af-9feb-c020a2e5384f"
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "=https://api.cloudflare.com/client/v4/zones/{{ $('Cloudflare: знайти зону').item.json.result[0].id }}/dns_records/{{ $json.result[0].id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "cloudflareApi",
+        "options": {}
+      },
+      "name": "Cloudflare: видалити DNS-запис",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2240,
+        912
+      ],
+      "id": "eaf52dc6-dd40-423d-b39d-20e572418e9a",
+      "credentials": {
+        "cloudflareApi": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Cloudflare account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const serverName = $('Визначити сервер і дію').first().json.name;\nlet snap = '';\ntry {\n  snap = $('Автоснепшот: перед видаленням').first().json.snapshot_id || '';\n} catch (e) {}\nlet msg = 'Сервер ' + serverName + ' успішно видалено з Hetzner та Cloudflare. Статус у таблиці оновлено на Deleted.';\nif (snap) {\n  msg += ' Перед видаленням створено автоснепшот (ID ' + snap + '); щоб його видалити пізніше: «видали снепшот ' + snap + '».';\n} else {\n  msg += ' Видалено БЕЗ снепшота за вашим рішенням. Автоматичні бекапи Hetzner цього сервера також видалено.';\n}\nreturn { success: true, message: msg, output: msg };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2688,
+        992
+      ],
+      "id": "4d5d80a1-678b-4bd8-b29c-ec7a4b8d4706",
+      "name": "Відповідь: сервер видалено"
+    },
+    {
+      "parameters": {
+        "jsCode": "const servers = $json.servers || [];\n\nif (servers.length === 0) {\n  return {\n    success: true,\n    output: \"Наразі у вашому акаунті Hetzner немає активних серверів.\"\n  };\n}\n\nconst list = servers.map(s => \n  `• *${s.name}* | ID: ${s.id} | IP: ${s.public_net?.ipv4?.ip || 'N/A'} | Тип: ${s.server_type?.name || 'N/A'} | Статус: ${s.status}`\n).join('\\n');\n\nreturn {\n  success: true,\n  output: `Ось список серверів:\\n\\n${list}`\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        96
+      ],
+      "id": "fa291d3a-5b59-44fb-8a24-53c857373207",
+      "name": "Відповідь: список серверів"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "<SUBWORKFLOW_ID>",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "mark_name": "={{ $('Визначити сервер і дію').first().json.name }}",
+            "mark_state": "🗑️ Deleted"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "mark_name",
+              "displayName": "mark_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "mark_state",
+              "displayName": "mark_state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "25e99442-3da3-41bd-907d-e137adb54db7",
+      "name": "Таблиця: позначити Deleted",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2464,
+        992
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "<SUBWORKFLOW_ID>",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "mark_name": "",
+            "mark_state": ""
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "mark_name",
+              "displayName": "mark_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "mark_state",
+              "displayName": "mark_state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "9c980a35-0059-403a-9735-c33fcecccd8e",
+      "name": "Таблиця: після вимкнення",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        896,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "<SUBWORKFLOW_ID>",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "mark_name": "",
+            "mark_state": ""
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "mark_name",
+              "displayName": "mark_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "mark_state",
+              "displayName": "mark_state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "bb1e26d8-5294-4d18-91f4-bcdedb9fa437",
+      "name": "Таблиця: після увімкнення",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        896,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "<SUBWORKFLOW_ID>",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "mark_name": "",
+            "mark_state": ""
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "mark_name",
+              "displayName": "mark_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "mark_state",
+              "displayName": "mark_state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "6763a8d8-425d-4e7a-8033-6222257530e9",
+      "name": "Таблиця: після зміни тарифу",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2240,
+        1440
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const e = $json.error;\nconst msg = e ? ('⚠️ ' + e + ($json.searched_for ? ' (шукали: ' + $json.searched_for + ')' : '')) : '⚠️ Невідома команда, дію не виконано.';\nreturn { success: false, message: msg, output: msg };"
+      },
+      "id": "0c564001-eaaa-4d81-9b1f-0a0ae835211b",
+      "name": "Відповідь: помилка агенту",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        1568
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "<SUBWORKFLOW_ID>",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "server_id": "={{ String($json.id) }}",
+            "server_name": "={{ $json.name }}",
+            "reason": "delete"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "server_id",
+              "displayName": "server_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "server_name",
+              "displayName": "server_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "8333b29f-016f-4ee6-b533-30c017ddcdc9",
+      "name": "Автоснепшот: перед видаленням",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        896,
+        1104
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "snap-ok-del",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "7f570c77-e5ad-4d05-885b-8f402a7e0f59",
+      "name": "Снепшот створено? (видалення)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1120,
+        1104
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "<SUBWORKFLOW_ID>",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "server_id": "={{ String($json.id) }}",
+            "server_name": "={{ $json.name }}",
+            "reason": "resize"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "server_id",
+              "displayName": "server_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "server_name",
+              "displayName": "server_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "9671aa5c-1e7e-4e2c-afcd-c7e9a31025ca",
+      "name": "Автоснепшот: перед зміною тарифу",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        672,
+        1376
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "snap-ok-res",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "fb8f1e2d-96ee-4b99-96ac-28f957d95fa7",
+      "name": "Снепшот створено? (зміна тарифу)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        896,
+        1376
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const m = '⚠️ Операцію скасовано: ' + ($json.message || 'автоснепшот не створено') + ' Сервер не змінено.';\nreturn { success: false, message: m, output: m };"
+      },
+      "id": "d65d5584-977a-4618-a7f5-604ea5e6d760",
+      "name": "Відповідь: снепшот не створено",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        1232
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "skip-snap-del",
+              "leftValue": "={{ $json.skipSnapshot === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "92e5a5ee-fe6b-47fa-86f1-67aa030d93b3",
+      "name": "Видалити без снепшота?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        672,
+        1040
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const types = ($json.server_types || []).filter(t => !t.deprecated);\nconst LOCS = ['nbg1', 'fsn1', 'hel1'];\nconst rows = [];\nfor (const t of types) {\n  let p = null;\n  for (const l of LOCS) {\n    p = (t.prices || []).find(x => x.location === l);\n    if (p) break;\n  }\n  if (!p) continue;\n  const price = Math.round(parseFloat(p.price_monthly.gross) * 100) / 100;\n  const arch = t.architecture === 'arm' ? ' (ARM)' : '';\n  const kind = t.cpu_type === 'dedicated' ? ' (Dedicated)' : '';\n  rows.push({ price, line: '• *' + t.name + '*: ' + t.cores + ' vCPU' + arch + kind + ', ' + t.memory + ' GB RAM, ' + t.disk + ' GB — *' + price.toFixed(2) + ' €/міс*' });\n}\nrows.sort((a, b) => a.price - b.price);\nconst list = rows.map(r => r.line).join('\\n');\nconst msg = 'Доступні тарифи (ціна за місяць з ПДВ, ЄС-локації; від дешевших до дорожчих):\\n' + list;\nreturn { success: true, message: msg, output: msg };"
+      },
+      "id": "f0c4698f-239e-4e2c-b4f3-3020fc328891",
+      "name": "Відповідь: список тарифів",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        288
+      ]
+    }
+  ],
+  "connections": {
+    "Вхід: команда з агента": {
+      "main": [
+        [
+          {
+            "node": "Маршрут: тип команди",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Маршрут: тип команди": {
+      "main": [
+        [
+          {
+            "node": "Hetzner: список серверів",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Hetzner: список тарифів",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Hetzner: видалити снепшот",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Hetzner: знайти сервер",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Hetzner: знайти сервер",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Hetzner: знайти сервер",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Hetzner: знайти сервер",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Hetzner: знайти сервер",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Hetzner: знайти сервер",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Hetzner: знайти сервер",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hetzner: список серверів": {
+      "main": [
+        [
+          {
+            "node": "Відповідь: список серверів",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hetzner: знайти сервер": {
+      "main": [
+        [
+          {
+            "node": "Визначити сервер і дію",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Визначити сервер і дію": {
+      "main": [
+        [
+          {
+            "node": "Маршрут: дія над сервером",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Маршрут: дія над сервером": {
+      "main": [
+        [
+          {
+            "node": "Hetzner: перезавантажити",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Hetzner: вимкнути",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Hetzner: увімкнути",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Hetzner: створити снепшот",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Hetzner: список снепшотів",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Видалити без снепшота?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Автоснепшот: перед зміною тарифу",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Відповідь: помилка агенту",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hetzner: перезавантажити": {
+      "main": [
+        [
+          {
+            "node": "Відповідь: перезавантаження",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hetzner: вимкнути": {
+      "main": [
+        [
+          {
+            "node": "Таблиця: після вимкнення",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hetzner: увімкнути": {
+      "main": [
+        [
+          {
+            "node": "Таблиця: після увімкнення",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hetzner: створити снепшот": {
+      "main": [
+        [
+          {
+            "node": "Відповідь: снепшот створюється",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hetzner: список снепшотів": {
+      "main": [
+        [
+          {
+            "node": "Відповідь: список снепшотів",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hetzner: вимкнути перед зміною тарифу": {
+      "main": [
+        [
+          {
+            "node": "Чекати 60 с (вимкнення)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Чекати 60 с (вимкнення)": {
+      "main": [
+        [
+          {
+            "node": "Hetzner: змінити тариф",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hetzner: змінити тариф": {
+      "main": [
+        [
+          {
+            "node": "Чекати 90 с (зміна тарифу)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Чекати 90 с (зміна тарифу)": {
+      "main": [
+        [
+          {
+            "node": "Hetzner: увімкнути після зміни тарифу",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hetzner: увімкнути після зміни тарифу": {
+      "main": [
+        [
+          {
+            "node": "Таблиця: після зміни тарифу",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hetzner: видалити сервер": {
+      "main": [
+        [
+          {
+            "node": "Cloudflare: знайти зону",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cloudflare: знайти зону": {
+      "main": [
+        [
+          {
+            "node": "Cloudflare: знайти DNS-запис",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cloudflare: знайти DNS-запис": {
+      "main": [
+        [
+          {
+            "node": "DNS-запис існує?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DNS-запис існує?": {
+      "main": [
+        [
+          {
+            "node": "Cloudflare: видалити DNS-запис",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Таблиця: позначити Deleted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cloudflare: видалити DNS-запис": {
+      "main": [
+        [
+          {
+            "node": "Таблиця: позначити Deleted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Таблиця: після вимкнення": {
+      "main": [
+        [
+          {
+            "node": "Відповідь: вимкнення",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Таблиця: після увімкнення": {
+      "main": [
+        [
+          {
+            "node": "Відповідь: увімкнення",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Таблиця: після зміни тарифу": {
+      "main": [
+        [
+          {
+            "node": "Відповідь: тариф змінено",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Таблиця: позначити Deleted": {
+      "main": [
+        [
+          {
+            "node": "Відповідь: сервер видалено",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Автоснепшот: перед видаленням": {
+      "main": [
+        [
+          {
+            "node": "Снепшот створено? (видалення)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Снепшот створено? (видалення)": {
+      "main": [
+        [
+          {
+            "node": "Hetzner: видалити сервер",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Відповідь: снепшот не створено",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Автоснепшот: перед зміною тарифу": {
+      "main": [
+        [
+          {
+            "node": "Снепшот створено? (зміна тарифу)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Снепшот створено? (зміна тарифу)": {
+      "main": [
+        [
+          {
+            "node": "Hetzner: вимкнути перед зміною тарифу",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Відповідь: снепшот не створено",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Видалити без снепшота?": {
+      "main": [
+        [
+          {
+            "node": "Hetzner: видалити сервер",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Автоснепшот: перед видаленням",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hetzner: список тарифів": {
+      "main": [
+        [
+          {
+            "node": "Відповідь: список тарифів",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  }
+}

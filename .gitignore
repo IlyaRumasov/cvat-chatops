@@ -1,0 +1,13 @@
+# Данные и выгрузки
+*.csv
+*.xlsx
+*.xls
+data/
+exports/
+
+# Секреты
+.env
+*.key
+*.pem
+.n8n-key
+settings.local.json

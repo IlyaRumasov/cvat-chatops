@@ -1,0 +1,569 @@
+{
+  "name": "CVAT-BOT | 2. Деплой сервера",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1376,
+        192
+      ],
+      "id": "0de12286-ed1d-46e5-912d-621e02421e21",
+      "name": "Вхід: параметри деплою"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $json;\nconst SECRET = '<WEBHOOK_SECRET>';\nconst BASE = 'https://n8n.example.com/webhook';\nconst ADMIN2_KEY = '<SSH_PUBLIC_KEY>\nconst zone = 'example.com';\n\n// --- Валідація вхідних даних (вони потрапляють у bash-скрипт) ---\nconst cleanProjectName = String(input.project_name || '').toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');\nif (!cleanProjectName) throw new Error('Порожня назва проєкту');\nconst email = String(input.email || '').trim();\nif (!/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$/.test(email)) throw new Error('Некоректний email');\nconst serverType = String(input.server_type || '').toLowerCase().trim();\nif (!/^[a-z0-9]+$/.test(serverType)) throw new Error('Некоректний тип сервера');\nconst managerUser = String(input.manager_username || '').trim();\nif (!/^[A-Za-z0-9_.-]{2,32}$/.test(managerUser)) throw new Error('Некоректний логін менеджера');\nconst chatSpace = String(input.chat_space || '').replace(/[^A-Za-z0-9_\\/-]/g, '');\n\nconst serverName = 'cvat-' + cleanProjectName;\nconst fqdn = serverName + '.' + zone;\n\nconst fill = (s, map) => Object.entries(map).reduce((acc, [k, v]) => acc.split('@@' + k + '@@').join(v), s);\n\nconst template = `#!/bin/bash\nexport DEBIAN_FRONTEND=noninteractive\nset -e\nSECRET='@@SECRET@@'\nSERVER_NAME='@@SERVER_NAME@@'\nCHAT_SPACE='@@CHAT_SPACE@@'\nFQDN='@@FQDN@@'\nEMAIL='@@EMAIL@@'\nMANAGER_USER='@@MANAGER_USER@@'\nSTATUS_URL='@@STATUS_URL@@'\nFINAL_URL='@@FINAL_URL@@'\n\napt-get update\napt-get install -y jq ca-certificates curl git wget software-properties-common openssl\n\nsend_status() {\n  jq -n --arg m \"$1\" --arg c \"$CHAT_SPACE\" '{message:$m,chat_space:$c}' | curl -s -X POST \"$STATUS_URL\" -H 'Content-Type: application/json' -H \"X-Webhook-Secret: $SECRET\" -d @- || true\n}\ncatch_error() {\n  jq -n --arg s \"$SERVER_NAME\" --arg c \"$CHAT_SPACE\" --arg m \"Критична помилка під час інсталяції на рядку $1. Деплой зупинено.\" '{status:\"failed\",server_name:$s,chat_space:$c,message:$m}' | curl -s -X POST \"$FINAL_URL\" -H 'Content-Type: application/json' -H \"X-Webhook-Secret: $SECRET\" -d @- || true\n}\ntrap 'catch_error $LINENO' ERR\n\nsend_status \"🚀 Починаю установку на сервері **$SERVER_NAME**. Етап 1/5: Користувачі та SSH...\"\n\n# === 1. Користувачі та SSH ===\ngenpw() { openssl rand -base64 24 | tr -d '/+=' | cut -c1-16; }\nADMIN1_PASS=$(genpw)\nADMIN2_PASS=$(genpw)\nCVAT_SU_PASS=$(genpw)\nMGR_PASS=$(genpw)\n\nuseradd -m -s /bin/bash -G sudo admin1\necho \"admin1:$ADMIN1_PASS\" | chpasswd\nuseradd -m -s /bin/bash -G sudo admin2\necho \"admin2:$ADMIN2_PASS\" | chpasswd\ninstall -d -m 700 -o admin2 -g admin2 /home/admin2/.ssh\necho '@@ADMIN2_KEY@@' > /home/admin2/.ssh/authorized_keys\nchown admin2:admin2 /home/admin2/.ssh/authorized_keys\nchmod 600 /home/admin2/.ssh/authorized_keys\npasswd -l root\n\ncat > /etc/ssh/sshd_config.d/10-cvat.conf <<EOF\nPasswordAuthentication yes\nPermitRootLogin prohibit-password\nEOF\nmkdir -p /run/sshd\nsshd -t\nsystemctl restart ssh\n\nsend_status \"⏳ Етап 2/5: Встановлення та налаштування Zabbix Agent 7.0...\"\n\n# === 2. Zabbix ===\nwget https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_7.0-2+ubuntu24.04_all.deb\ndpkg -i zabbix-release_7.0-2+ubuntu24.04_all.deb\napt-get update\napt-get install -y zabbix-agent\n\ntee /etc/zabbix/zabbix_agentd.conf <<EOF\nPidFile=/run/zabbix/zabbix_agentd.pid\nLogFile=/var/log/zabbix/zabbix_agentd.log\nLogFileSize=0\nServer=<MONITORING_SERVER_IP>\nServerActive=\nHostname=$SERVER_NAME\nEOF\n\nsystemctl daemon-reload\nsystemctl enable zabbix-agent\nsystemctl restart zabbix-agent\n\nsend_status \"⏳ Етап 3/5: Встановлення Docker та клонування CVAT (це займе ~5-10 хв)...\"\n\n# === 3. Docker ===\ninstall -m 0755 -d /etc/apt/keyrings\ncurl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc\nchmod a+r /etc/apt/keyrings/docker.asc\n. /etc/os-release\necho \"deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $VERSION_CODENAME stable\" | tee /etc/apt/sources.list.d/docker.list > /dev/null\napt-get update\napt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin\nusermod -aG docker admin1\nusermod -aG docker admin2\n\n# === 4. CVAT ===\nmkdir -p /docker\ncd /docker\ngit clone https://github.com/cvat-ai/cvat\ncd cvat\nexport CVAT_HOST=$FQDN\nexport ACME_EMAIL=$EMAIL\ndocker compose -f docker-compose.yml -f docker-compose.https.yml up -d --build\n\nsend_status \"⏳ Етап 4/5: Контейнери CVAT запущені. Налаштовую Firewall (UFW)...\"\n\n# === 5. UFW ===\nufw allow http\nufw allow https\nufw allow from <MONITORING_SERVER_IP>\nufw allow from <TRUSTED_IP>\nufw --force enable\n\nsend_status \"⏳ Етап 5/5: Встановлення Fail2Ban та очікування міграцій баз даних...\"\n\n# === 6. Fail2Ban ===\napt-get install -y fail2ban\ncat <<EOF > /etc/fail2ban/jail.local\n[DEFAULT]\nbantime = 3600\nfindtime = 600\nmaxretry = 5\n\n[sshd]\nenabled = true\nport = ssh\nfilter = sshd\nlogpath = /var/log/auth.log\nmaxretry = 3\nEOF\nsystemctl enable fail2ban\nsystemctl restart fail2ban\n\n# === 7. Суперкористувачі CVAT ===\nfor i in $(seq 1 20); do\n  if docker exec cvat_server python3 manage.py migrate; then\n    break\n  fi\n  sleep 15\ndone\n\ndocker exec cvat_server bash -c \"DJANGO_SUPERUSER_USERNAME=django DJANGO_SUPERUSER_PASSWORD=$CVAT_SU_PASS DJANGO_SUPERUSER_EMAIL=django@$FQDN python3 ~/manage.py createsuperuser --noinput\" || true\ndocker exec cvat_server bash -c \"DJANGO_SUPERUSER_USERNAME=$MANAGER_USER DJANGO_SUPERUSER_PASSWORD=$MGR_PASS DJANGO_SUPERUSER_EMAIL=$EMAIL python3 ~/manage.py createsuperuser --noinput\" || true\n\nsend_status \"✅ Встановлення на $SERVER_NAME завершено успішно! Надсилаю паролі...\"\n\n# === 8. Фінальний звіт ===\nSERVER_IP=$(hostname -I | awk '{print $1}')\njq -n --arg ip \"$SERVER_IP\" --arg s \"$SERVER_NAME\" --arg u \"https://$FQDN\" --arg c \"$CHAT_SPACE\" --arg admin1 \"$ADMIN1_PASS\" --arg admin2 \"$ADMIN2_PASS\" --arg su \"$CVAT_SU_PASS\" --arg mu \"$MANAGER_USER\" --arg mp \"$MGR_PASS\" '{status:\"success\",ip:$ip,server_name:$s,url:$u,chat_space:$c,admin1_password:$admin1,admin2_password:$admin2,cvat_superuser:\"django\",cvat_superuser_password:$su,manager_username:$mu,manager_password:$mp}' | curl -s -X POST \"$FINAL_URL\" -H 'Content-Type: application/json' -H \"X-Webhook-Secret: $SECRET\" -d @-\n`;\n\nconst installScript = fill(template, {\n  SECRET: SECRET,\n  SERVER_NAME: serverName,\n  CHAT_SPACE: chatSpace,\n  FQDN: fqdn,\n  EMAIL: email,\n  MANAGER_USER: managerUser,\n  STATUS_URL: BASE + '/cvat-status',\n  FINAL_URL: BASE + '/cvat-final-callback',\n  ADMIN2_KEY: ADMIN2_KEY\n});\n\nconst encodedScript = Buffer.from(installScript).toString('base64');\n\nreturn [{\n  json: {\n    subdomain: serverName,\n    serverName: serverName,\n    server_type: serverType,\n    zone_name: zone,\n    hetzner_body: {\n      name: serverName,\n      server_type: serverType,\n      location: 'nbg1',\n      image: 'ubuntu-24.04',\n      ssh_keys: ['<HETZNER_SSH_KEY_1>', '<HETZNER_SSH_KEY_2>'],\n      user_data: `#cloud-config\nssh_pwauth: true\nwrite_files:\n  - path: /root/install.sh\n    permissions: '0755'\n    encoding: b64\n    content: ${encodedScript}\nruncmd:\n  - /root/install.sh`\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1152,
+        192
+      ],
+      "id": "5da301f9-431c-4180-8d5d-e8c438ec2c34",
+      "name": "Скрипт: зібрати інсталяцію"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hetzner.cloud/v1/servers",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.hetzner_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -256,
+        96
+      ],
+      "id": "fac5c51f-2eff-4471-9022-90f4a2cd4f40",
+      "name": "Hetzner: створити сервер",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Hetzner Cloud"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://api.cloudflare.com/client/v4/zones",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "cloudflareApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "name",
+              "value": "={{ $('Скрипт: зібрати інсталяцію').item.json.zone_name }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -32,
+        192
+      ],
+      "id": "07b2193a-1252-44b0-9ebf-8a70519ebc39",
+      "name": "Cloudflare: знайти зону",
+      "credentials": {
+        "cloudflareApi": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Cloudflare account"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "url": "=https://api.cloudflare.com/client/v4/zones/{{ $json.result[0].id }}/dns_records",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "cloudflareApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "name",
+              "value": "={{ $('Скрипт: зібрати інсталяцію').item.json.subdomain }}.{{ $('Скрипт: зібрати інсталяцію').item.json.zone_name }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        192,
+        192
+      ],
+      "id": "3a771fca-afb8-4077-b6e6-5e46d95c8560",
+      "name": "Cloudflare: знайти DNS-запис",
+      "credentials": {
+        "cloudflareApi": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Cloudflare account"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b3e9447e-2e55-472e-8a03-9d41334c2642",
+              "leftValue": "={{ $json.result.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        416,
+        192
+      ],
+      "id": "25f825c6-98c5-4cf4-a46b-18d537639060",
+      "name": "DNS-запис уже є?"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://api.cloudflare.com/client/v4/zones/{{ $('Cloudflare: знайти зону').item.json.result[0].id }}/dns_records/{{ $('Cloudflare: знайти DNS-запис').item.json.result[0].id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "cloudflareApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"type\": \"A\",\n  \"name\": \"{{ $('Скрипт: зібрати інсталяцію').item.json.subdomain }}\",\n  \"content\": \"{{ $('Hetzner: створити сервер').item.json.server.public_net.ipv4.ip }}\",\n  \"ttl\": 1,\n  \"proxied\": false\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        640,
+        96
+      ],
+      "id": "860f1de6-2f36-4e11-9ee3-9c87fcdedf4b",
+      "name": "Cloudflare: оновити DNS-запис",
+      "credentials": {
+        "cloudflareApi": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Cloudflare account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.cloudflare.com/client/v4/zones/{{ $('Cloudflare: знайти зону').item.json.result[0].id }}/dns_records",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "cloudflareApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"type\": \"A\",\n  \"name\": \"{{ $('Скрипт: зібрати інсталяцію').item.json.subdomain }}\",\n  \"content\": \"{{ $('Hetzner: створити сервер').item.json.server.public_net.ipv4.ip }}\",\n  \"ttl\": 1,\n  \"proxied\": false\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        640,
+        288
+      ],
+      "id": "a17a4e64-44d7-4c34-b158-b8f279c17baf",
+      "name": "Cloudflare: створити DNS-запис",
+      "credentials": {
+        "cloudflareApi": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Cloudflare account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## 2. Деплой сервера\nВикликається з «1. Чат-агент». Вхід: project_name, manager_username, email, server_type, chat_space.\n1) Скрипт збирає інсталяційний bash-скрипт (користувачі admin1 і admin2, Zabbix, Docker, CVAT, UFW, Fail2Ban; паролі генеруються на сервері).\n2) Hetzner створює сервер (ubuntu-24.04, nbg1) з цим скриптом у user_data.\n3) Cloudflare: створює або оновлює A-запис <сервер>.example.com.\n4) Таблиця: рядок зі статусом «🟡 Installing».\nРезультат інсталяції приходить на «3. Приймач результату деплою», прогрес — на вебхук статусу в «1. Чат-агент».\nУвага: в скрипті зашиті секрет вебхуків та публічний ключ вашого користувача admin2.",
+        "height": 280,
+        "width": 700
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1200,
+        416
+      ],
+      "typeVersion": 1,
+      "id": "17918a45-737f-4527-b726-b9e438815cbf",
+      "name": "Опис флоу"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "<SUBWORKFLOW_ID>",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "mark_name": "={{ $node[\"Скрипт: зібрати інсталяцію\"].json.serverName }}",
+            "mark_state": "🟡 Installing",
+            "mark_chat": "={{ $node[\"Вхід: параметри деплою\"].json.chat_space }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "mark_name",
+              "displayName": "mark_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "mark_state",
+              "displayName": "mark_state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "mark_chat",
+              "displayName": "mark_chat",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "e65364e0-d846-480a-8069-4fe38793b486",
+      "name": "Таблиця: позначити Installing",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        864,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.hetzner.cloud/v1/server_types?name={{ encodeURIComponent($json.server_type) }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {}
+      },
+      "id": "073ae512-375f-4e2f-9a42-f36845c77af3",
+      "name": "Hetzner: перевірити тариф",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -928,
+        192
+      ],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Hetzner Cloud"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $('Скрипт: зібрати інсталяцію').first().json;\nconst st = ($json.server_types || [])[0];\nconst chat = String($('Вхід: параметри деплою').first().json.chat_space || '');\n\nif (!st) {\n  return [{ json: { abort: true, chat_space: chat, message: '⚠️ Тариф \"' + item.server_type + '\" не знайдено в Hetzner. Деплой не запущено. Перегляньте доступні тарифи командою «покажи тарифи».' } }];\n}\n\nconst EU = ['nbg1', 'fsn1', 'hel1'];\nconst avail = (st.locations || []).filter(l => l.available).map(l => l.name);\nconst pick = EU.find(l => avail.indexOf(l) >= 0);\n\nif (!pick) {\n  return [{ json: { abort: true, chat_space: chat, message: '⚠️ Тариф ' + String(st.name || item.server_type).toUpperCase() + ' зараз недоступний у європейських локаціях (nbg1, fsn1, hel1). Доступно лише: ' + (avail.join(', ') || 'ніде') + '. Деплой не запущено. Оберіть інший тариф, наприклад cpx42.' } }];\n}\n\nconst out = JSON.parse(JSON.stringify(item));\nout.hetzner_body.location = pick;\nout.location = pick;\nout.chat_space = chat;\nreturn [{ json: out }];"
+      },
+      "id": "b254f3c7-8f66-4f1e-80de-06ac389bee9a",
+      "name": "Вибрати локацію",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -704,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "tariff-ok",
+              "leftValue": "={{ $json.abort !== true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "376601d7-233d-4b35-9eed-f138020f0e81",
+      "name": "Тариф доступний?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -480,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://chat.googleapis.com/v1/{{ $json.chat_space }}/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleApi",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "={{ $json.message }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a624ded6-2f74-4e51-ab3e-4189aaf1f9a3",
+      "name": "Чат: тариф недоступний",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -256,
+        288
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Google Service Account CVAT_BOT"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://chat.googleapis.com/v1/{{ $('Вибрати локацію').first().json.chat_space }}/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleApi",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "=❌ Не вдалося створити сервер {{ $('Вибрати локацію').first().json.serverName }} у Hetzner: {{ $json.error && $json.error.message ? $json.error.message : 'невідома помилка' }}\nДеплой зупинено, DNS-запис і рядок у таблиці не створювались."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "260d0967-b79c-4bb6-b9e1-183106001ca0",
+      "name": "Чат: помилка створення сервера",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -32,
+        0
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Google Service Account CVAT_BOT"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Вхід: параметри деплою": {
+      "main": [
+        [
+          {
+            "node": "Скрипт: зібрати інсталяцію",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hetzner: створити сервер": {
+      "main": [
+        [
+          {
+            "node": "Cloudflare: знайти зону",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Чат: помилка створення сервера",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cloudflare: знайти зону": {
+      "main": [
+        [
+          {
+            "node": "Cloudflare: знайти DNS-запис",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cloudflare: знайти DNS-запис": {
+      "main": [
+        [
+          {
+            "node": "DNS-запис уже є?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DNS-запис уже є?": {
+      "main": [
+        [
+          {
+            "node": "Cloudflare: оновити DNS-запис",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Cloudflare: створити DNS-запис",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cloudflare: оновити DNS-запис": {
+      "main": [
+        [
+          {
+            "node": "Таблиця: позначити Installing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cloudflare: створити DNS-запис": {
+      "main": [
+        [
+          {
+            "node": "Таблиця: позначити Installing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Скрипт: зібрати інсталяцію": {
+      "main": [
+        [
+          {
+            "node": "Hetzner: перевірити тариф",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hetzner: перевірити тариф": {
+      "main": [
+        [
+          {
+            "node": "Вибрати локацію",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Вибрати локацію": {
+      "main": [
+        [
+          {
+            "node": "Тариф доступний?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Тариф доступний?": {
+      "main": [
+        [
+          {
+            "node": "Hetzner: створити сервер",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Чат: тариф недоступний",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  }
+}

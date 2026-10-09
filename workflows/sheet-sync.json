@@ -1,0 +1,634 @@
+{
+  "name": "CVAT-BOT | Синхронізація таблиці",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 10
+            }
+          ]
+        }
+      },
+      "id": "281e27cb-2edd-42cb-8afd-129542d03d89",
+      "name": "Запуск: кожні 10 хв",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        464,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.hetzner.cloud/v1/servers",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "per_page",
+              "value": "50"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "33742904-901f-4248-ab9f-755f0893c338",
+      "name": "Hetzner: список серверів",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        688,
+        400
+      ],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Hetzner Cloud"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "<GOOGLE_SHEET_ID>"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "0",
+          "cachedResultName": "Аркуш1"
+        },
+        "options": {}
+      },
+      "id": "97e05873-7016-4c69-96d2-11a948c1edf7",
+      "name": "Таблиця: прочитати рядки",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        912,
+        400
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Google Sheets OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const servers = $('Hetzner: список серверів').first().json.servers || [];\nconst rows = $input.all().map(i => i.json);\n\nlet mark = null;\ntry {\n  const t = $('Вхід: виклик з іншого флоу').first().json;\n  if (t && t.mark_name) mark = { name: String(t.mark_name), state: String(t.mark_state || ''), chat: String(t.mark_chat || '') };\n} catch (e) {}\n\nconst ZONE = 'example.com';\nconst TZ = 'Europe/Kyiv';\nconst FMT = 'yyyy-LL-dd HH:mm';\nconst nowDt = DateTime.now().setZone(TZ);\nconst now = nowDt.toFormat(FMT);\nconst INSTALL_TIMEOUT_MIN = 25;\n\nconst stateMap = {\n  running: '🟢 On', off: '🔴 Off', initializing: '🟡 Starting', starting: '🟡 Starting',\n  stopping: '🟡 Stopping', migrating: '🟡 Migrating', rebuilding: '🟡 Rebuilding', deleting: '🗑️ Deleted'\n};\nconst num = v => parseFloat(String(v === undefined || v === null ? '' : v).replace(',', '.'));\n\nconst byName = {};\nfor (const r of rows) {\n  if (r['Назва']) byName[String(r['Назва'])] = r;\n}\nconst hz = {};\nfor (const s of servers) {\n  if (String(s.name).startsWith('cvat-')) hz[s.name] = s;\n}\n\nconst out = [];\n\nfor (const name of Object.keys(hz)) {\n  const s = hz[name];\n  const t = s.server_type || {};\n  const loc = s.location || (s.datacenter && s.datacenter.location) || {};\n  const specs = String(t.name || '').toUpperCase() + ' | ' + (t.architecture || '') + ' | ' + s.primary_disk_size + ' GB | ' + (loc.network_zone || '');\n  const p = (t.prices || []).find(x => x.location === loc.name);\n  const price = p ? Math.round(num(p.price_monthly.gross) * 100) / 100 : '';\n  const ip = (s.public_net && s.public_net.ipv4 && s.public_net.ipv4.ip) || '';\n  const url = 'https://' + name + '.' + ZONE;\n  const row = byName[name];\n  const cur = row ? String(row['Стан'] || '') : '';\n  const isMarked = mark && mark.name === name;\n  const rowChat = row ? String(row['Chat'] || '') : '';\n\n  let state = stateMap[s.status] || ('⚪ ' + s.status);\n  let timedOut = false;\n  if (isMarked) {\n    state = mark.state;\n  } else if (row && cur.indexOf('Failed') >= 0) {\n    state = cur;\n  } else if (row && cur.indexOf('Installing') >= 0) {\n    const started = DateTime.fromFormat(String(row['Оновлено'] || ''), FMT, { zone: TZ });\n    const ageMin = started.isValid ? nowDt.diff(started, 'minutes').minutes : 0;\n    if (ageMin > INSTALL_TIMEOUT_MIN) {\n      state = '❌ Failed (timeout)';\n      timedOut = true;\n    } else {\n      continue;\n    }\n  }\n\n  const chat = (isMarked && mark.chat) ? mark.chat : rowChat;\n  const next = { 'Назва': name, 'Характеристики': specs, 'Стан': state, 'Ціна': price, 'IP': ip, 'URL': url, 'Chat': chat };\n  if (timedOut && chat) {\n    next.notify_space = chat;\n    next.notify_text = '⚠️ Установка ' + name + ' не завершилась за ' + INSTALL_TIMEOUT_MIN + ' хвилин (статус: ❌ Failed (timeout)). IP: ' + ip + '. Перевірте лог на сервері: /var/log/cloud-init-output.log';\n  }\n  if (row) {\n    const same = String(row['Характеристики'] || '') === specs\n      && cur === state\n      && num(row['Ціна']) === num(price)\n      && String(row['IP'] || '') === ip\n      && String(row['URL'] || '') === url\n      && rowChat === chat;\n    if (same) continue;\n    next['Оновлено'] = now;\n    next.op = 'update';\n    next.row_number = row.row_number;\n  } else {\n    next['Оновлено'] = now;\n    next.op = 'append';\n  }\n  out.push(next);\n}\n\nfor (const name of Object.keys(byName)) {\n  if (!name.startsWith('cvat-') || hz[name]) continue;\n  const row = byName[name];\n  const cur = String(row['Стан'] || '');\n  if (cur.indexOf('Delete') >= 0) continue;\n  out.push({\n    op: 'update',\n    row_number: row.row_number,\n    'Назва': name,\n    'Характеристики': row['Характеристики'] || '',\n    'Стан': '🗑️ Deleted',\n    'Ціна': row['Ціна'] === undefined ? '' : row['Ціна'],\n    'IP': row['IP'] || '',\n    'URL': row['URL'] || '',\n    'Chat': row['Chat'] || '',\n    'Оновлено': now\n  });\n}\n\nreturn out.map(r => ({ json: r }));"
+      },
+      "id": "bb022b80-19f7-4aaf-ad0a-19e6bc1f216a",
+      "name": "Побудувати план оновлення",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1136,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.op }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "update"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "40f9ef47-bf60-4826-b15d-7553507c36a8",
+      "name": "Рядок уже є?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1360,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "<GOOGLE_SHEET_ID>"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "0",
+          "cachedResultName": "Аркуш1"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": "={{ $json.row_number }}",
+            "Назва": "={{ $json['Назва'] }}",
+            "Характеристики": "={{ $json['Характеристики'] }}",
+            "Стан": "={{ $json['Стан'] }}",
+            "Ціна": "={{ $json['Ціна'] }}",
+            "IP": "={{ $json['IP'] }}",
+            "URL": "={{ $json['URL'] }}",
+            "Оновлено": "={{ $json['Оновлено'] }}",
+            "Chat": "={{ $json['Chat'] }}"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "Назва",
+              "displayName": "Назва",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Характеристики",
+              "displayName": "Характеристики",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Стан",
+              "displayName": "Стан",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Ціна",
+              "displayName": "Ціна",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "IP",
+              "displayName": "IP",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "URL",
+              "displayName": "URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Оновлено",
+              "displayName": "Оновлено",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Chat",
+              "displayName": "Chat",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "c3de4ff9-f66f-4cab-9d3a-e1a1fac080b2",
+      "name": "Таблиця: оновити рядок",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1584,
+        208
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Google Sheets OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "<GOOGLE_SHEET_ID>"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "0",
+          "cachedResultName": "Аркуш1"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Назва": "={{ $json['Назва'] }}",
+            "Характеристики": "={{ $json['Характеристики'] }}",
+            "Стан": "={{ $json['Стан'] }}",
+            "Ціна": "={{ $json['Ціна'] }}",
+            "IP": "={{ $json['IP'] }}",
+            "URL": "={{ $json['URL'] }}",
+            "Оновлено": "={{ $json['Оновлено'] }}",
+            "Chat": "={{ $json['Chat'] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Назва",
+              "displayName": "Назва",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Характеристики",
+              "displayName": "Характеристики",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Стан",
+              "displayName": "Стан",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Ціна",
+              "displayName": "Ціна",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "IP",
+              "displayName": "IP",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "URL",
+              "displayName": "URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Оновлено",
+              "displayName": "Оновлено",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Chat",
+              "displayName": "Chat",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "65e4cd6a-48a8-4e8c-a57b-12cd1fe68ef1",
+      "name": "Таблиця: додати рядок",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1584,
+        400
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Google Sheets OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "mark_name"
+            },
+            {
+              "name": "mark_state"
+            },
+            {
+              "name": "mark_chat"
+            }
+          ]
+        }
+      },
+      "id": "803664f0-afae-4ba6-9b5e-181c46a624b8",
+      "name": "Вхід: виклик з іншого флоу",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 20,
+        "unit": "seconds"
+      },
+      "id": "25a4dcb3-382c-4353-a3ac-50d7aa6ef983",
+      "name": "Чекати 20 с (Hetzner)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        464,
+        304
+      ],
+      "webhookId": "53a5c684-6ec8-417d-a2c6-e7e297565df3"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "alert-1",
+              "leftValue": "={{ $json.notify_space || '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "49772b2d-4b79-4a1b-8f12-36e92436bfb0",
+      "name": "Треба сповістити чат?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1360,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://chat.googleapis.com/v1/{{ $json.notify_space }}/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleApi",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "={{ $json.notify_text }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "63f99521-4f81-4e98-a062-4fd37c5c03be",
+      "name": "Чат: таймаут інсталяції",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1584,
+        592
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Google Service Account CVAT_BOT"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Синхронізація таблиці «Hetzner cvat»\nБере сервери cvat-* з Hetzner і оновлює Google-таблицю: стан, характеристики, ціна за тарифом, IP, URL.\n**Запуски:** кожні 10 хв + виклик з флоу деплою, приймача результату та інструмента Hetzner (без очікування).\n**Стани:** 🟢 On, 🔴 Off, 🟡 Installing, ❌ Failed, 🗑️ Deleted. Installing > 25 хв → Failed (timeout) + сповіщення в чат.\n**Таблиця:** колонки Назва, Характеристики, Стан, Ціна, IP, URL, Оновлено, Chat (службова).",
+        "height": 242,
+        "width": 748
+      },
+      "id": "4866947d-13d7-41ec-939c-af988dbe4c6b",
+      "name": "Опис флоу",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        208,
+        32
+      ]
+    }
+  ],
+  "connections": {
+    "Запуск: кожні 10 хв": {
+      "main": [
+        [
+          {
+            "node": "Hetzner: список серверів",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Вхід: виклик з іншого флоу": {
+      "main": [
+        [
+          {
+            "node": "Чекати 20 с (Hetzner)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Чекати 20 с (Hetzner)": {
+      "main": [
+        [
+          {
+            "node": "Hetzner: список серверів",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hetzner: список серверів": {
+      "main": [
+        [
+          {
+            "node": "Таблиця: прочитати рядки",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Таблиця: прочитати рядки": {
+      "main": [
+        [
+          {
+            "node": "Побудувати план оновлення",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Побудувати план оновлення": {
+      "main": [
+        [
+          {
+            "node": "Рядок уже є?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Треба сповістити чат?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Рядок уже є?": {
+      "main": [
+        [
+          {
+            "node": "Таблиця: оновити рядок",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Таблиця: додати рядок",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Треба сповістити чат?": {
+      "main": [
+        [
+          {
+            "node": "Чат: таймаут інсталяції",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  }
+}

@@ -1,0 +1,289 @@
+{
+  "name": "CVAT-BOT | Інструмент: Автоснепшот",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "server_id"
+            },
+            {
+              "name": "server_name"
+            },
+            {
+              "name": "reason"
+            }
+          ]
+        }
+      },
+      "id": "1bda7470-a9c9-447b-be71-62b504963604",
+      "name": "Вхід: автоснепшот",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://api.hetzner.cloud/v1/servers/' + $json.server_id + '/actions/create_image' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { description: 'auto-' + $json.reason + '-' + $json.server_name + '-' + $now.setZone('Europe/Kyiv').toFormat('yyyy-LL-dd_HH-mm'), type: 'snapshot', labels: { auto: 'true' } } }}",
+        "options": {}
+      },
+      "id": "636efcce-5bb7-41a4-9cf2-39b29f0615d0",
+      "name": "Створити снепшот",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        464,
+        336
+      ],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Hetzner Cloud"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 30,
+        "unit": "seconds"
+      },
+      "id": "196b6dd3-4532-472a-9283-5a28c707bc2c",
+      "name": "Чекати 30 с",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        688,
+        336
+      ],
+      "webhookId": "0b69e8ce-dca0-4fe9-9291-e7ee0c267065"
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://api.hetzner.cloud/v1/images/' + $('Створити снепшот').first().json.image.id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {}
+      },
+      "id": "ca129807-4bb0-4957-9e37-4b2be1307640",
+      "name": "Перевірити стан снепшота",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        912,
+        256
+      ],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Hetzner Cloud"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.image.status }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "available"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "5e3810d2-9ed9-465b-9f0a-bfe77ad5712f",
+      "name": "Снепшот готовий?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1136,
+        256
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const id = $('Створити снепшот').first().json.image.id;\nreturn [{ json: { ok: true, snapshot_id: String(id), message: 'Автоснепшот створено (ID ' + id + ').' } }];"
+      },
+      "id": "9b6842e6-8fd4-4edb-802d-542e45ebf650",
+      "name": "Результат: снепшот створено",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "timeout-check",
+              "leftValue": "={{ $runIndex }}",
+              "rightValue": 80,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "ac328339-37ff-4a74-9019-d2f9eaf357ec",
+      "name": "Час вичерпано?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1360,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { ok: false, snapshot_id: '', message: 'Автоснепшот не завершився за 40 хвилин, операцію скасовано. Перевірте знімок у Hetzner.' } }];"
+      },
+      "id": "b1731d4f-e688-4ca4-9ce3-94f34984760a",
+      "name": "Результат: таймаут снепшота",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1584,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Автоснепшот\nСтворює снепшот сервера Hetzner і чекає (до 40 хв), поки він стане доступним.\n**Викликається:** «CVAT-BOT | Інструмент: Hetzner (основний)» перед видаленням сервера та зміною тарифу.\n**Вхід:** server_id, server_name, reason (delete | resize).\n**Вихід:** ok, snapshot_id, message. Якщо ok=false — операція скасовується.\nНазва снепшота: auto-<причина>-<сервер>-<рррр-мм-дд_гг-хх> (київський час).",
+        "height": 190,
+        "width": 620
+      },
+      "id": "9168032e-29dc-46ae-af3f-e29108c85fee",
+      "name": "Опис флоу",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        208,
+        64
+      ]
+    }
+  ],
+  "connections": {
+    "Створити снепшот": {
+      "main": [
+        [
+          {
+            "node": "Чекати 30 с",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Вхід: автоснепшот": {
+      "main": [
+        [
+          {
+            "node": "Створити снепшот",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Чекати 30 с": {
+      "main": [
+        [
+          {
+            "node": "Перевірити стан снепшота",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Перевірити стан снепшота": {
+      "main": [
+        [
+          {
+            "node": "Снепшот готовий?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Снепшот готовий?": {
+      "main": [
+        [
+          {
+            "node": "Результат: снепшот створено",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Час вичерпано?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Час вичерпано?": {
+      "main": [
+        [
+          {
+            "node": "Результат: таймаут снепшота",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Чекати 30 с",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  }
+}
