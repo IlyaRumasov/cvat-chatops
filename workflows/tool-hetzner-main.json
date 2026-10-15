@@ -311,7 +311,7 @@
     },
     {
       "parameters": {
-        "url": "https://api.hetzner.cloud/v1/server_types",
+        "url": "https://api.hetzner.cloud/v1/server_types?per_page=50",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpBearerAuth",
         "options": {}
@@ -1521,7 +1521,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const types = ($json.server_types || []).filter(t => !t.deprecated);\nconst LOCS = ['nbg1', 'fsn1', 'hel1'];\nconst rows = [];\nfor (const t of types) {\n  let p = null;\n  for (const l of LOCS) {\n    p = (t.prices || []).find(x => x.location === l);\n    if (p) break;\n  }\n  if (!p) continue;\n  const price = Math.round(parseFloat(p.price_monthly.gross) * 100) / 100;\n  const arch = t.architecture === 'arm' ? ' (ARM)' : '';\n  const kind = t.cpu_type === 'dedicated' ? ' (Dedicated)' : '';\n  rows.push({ price, line: '• *' + t.name + '*: ' + t.cores + ' vCPU' + arch + kind + ', ' + t.memory + ' GB RAM, ' + t.disk + ' GB — *' + price.toFixed(2) + ' €/міс*' });\n}\nrows.sort((a, b) => a.price - b.price);\nconst list = rows.map(r => r.line).join('\\n');\nconst msg = 'Доступні тарифи (ціна за місяць з ПДВ, ЄС-локації; від дешевших до дорожчих):\\n' + list;\nreturn { success: true, message: msg, output: msg };"
+        "jsCode": "const types = ($json.server_types || []).filter(t => !t.deprecated);\nconst LOCS = ['nbg1', 'fsn1', 'hel1'];\nconst rows = [];\nfor (const t of types) {\n  let p = null;\n  for (const l of LOCS) {\n    p = (t.prices || []).find(x => x.location === l);\n    if (p) break;\n  }\n  if (!p) continue;\n  if (t.locations && !t.locations.some(x => LOCS.includes(x.name) && x.available)) continue;\n  const price = Math.round(parseFloat(p.price_monthly.gross) * 100) / 100;\n  const arch = t.architecture === 'arm' ? ' (ARM)' : '';\n  const kind = t.cpu_type === 'dedicated' ? ' (Dedicated)' : '';\n  rows.push({ price, line: '• *' + t.name + '*: ' + t.cores + ' vCPU' + arch + kind + ', ' + t.memory + ' GB RAM, ' + t.disk + ' GB — *' + price.toFixed(2) + ' €/міс*' });\n}\nrows.sort((a, b) => a.price - b.price);\nconst list = rows.map(r => r.line).join('\\n');\nconst msg = 'Доступні тарифи (ціна за місяць з ПДВ, ЄС-локації; від дешевших до дорожчих):\\n' + list;\nreturn { success: true, message: msg, output: msg };"
       },
       "id": "f0c4698f-239e-4e2c-b4f3-3020fc328891",
       "name": "Відповідь: список тарифів",
