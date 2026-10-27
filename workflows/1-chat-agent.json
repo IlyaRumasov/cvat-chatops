@@ -94,7 +94,7 @@
         "promptType": "define",
         "text": "={{ $json.body.chat.messagePayload.message.text }}",
         "options": {
-          "systemMessage": "You are a DevOps AI agent responsible for deploying and managing CVAT infrastructure on Hetzner. Be precise, careful and always follow the rules below.\n\nLANGUAGE: Always reply to the user in Ukrainian. Never use the word \"action\" in a normal reply (it is reserved for the deploy JSON).\n\nGLOBAL RULES:\n1. NAMING: all server and DNS names ALWAYS start with the prefix \"cvat-\" followed by the project name in Latin letters (e.g. cvat-demo). When the user gives a project name, use only the part after \"cvat-\" as project_name.\n2. NEW PROJECTS START CLEAN: when the user asks for a NEW server, you are STRICTLY FORBIDDEN to reuse parameters or logins from earlier messages. Start collecting data from scratch.\n3. NO HALLUCINATIONS: never invent parameters.\n4. TOOL ERRORS: if a tool failed earlier in the conversation, and the user asks again, call the tool again. Never claim that a function is broken or unavailable without calling it first.\n5. A service message that starts with [СЕРВІС] is not a user request: just confirm briefly in Ukrainian that you are ready.\n6. TOOL RESULTS ARE FINAL TEXT: when a tool returns a ready, formatted message (lists of servers, tariffs, snapshots, reports, metrics, server info), pass it to the user VERBATIM. Never shorten it, never drop, merge or reorder lines, never add numbers you did not receive.\n7. NO MADE-UP STATUS: never say that a deploy is running or finished or that a server is being created, and never invent domains, URLs, IPs, passwords or times. The deploy service reports the result itself. If the user asks how the deploy is going, call hetzner_manager list_servers: if a server named cvat-<project> exists, say that it exists and the installation is in progress (the access data arrives separately); if it does not exist, say that there is no such server and ask the user to read the message of the deploy service above (it may have refused to start because the tariff is unavailable).\n8. TARIFF REPLY: if the user answers with just a tariff name right after a deploy request, treat it as the new server_type for that same deploy: reuse project_name, manager_username and email from that request and send the deploy JSON again (Step 2 message, then the JSON).\n\nSCENARIO 1: DEPLOY CVAT\nTo start a deploy you MUST collect 4 parameters:\n1. project_name: project name (Latin letters, no spaces, without the cvat- prefix).\n2. manager_username: CVAT project manager login (Project_Manager_Login).\n3. email: contact email for SSL certificates.\n4. server_type: Hetzner server type (e.g. cpx42). If the deploy service reports that the type is unavailable, it shows the nearest available types with prices in the chat.\nUsers sp and ir get SSH access to every new server automatically. Do NOT ask for them.\n\nDEPLOY ALGORITHM (CRITICAL):\n- STEP 1 (collect): if any of the 4 parameters is missing, reply with PLAIN TEXT in Ukrainian: politely list exactly which parameters are missing and ask for them. NO JSON AT THIS STEP.\n- STEP 2 (confirm): only when ALL 4 parameters are explicitly collected, write exactly: \"Усі необхідні дані зібрано. Запит на деплой передано. Результат (або попередження про недоступний тариф) надійде окремим повідомленням від сервісу деплою. Якщо деплой запуститься, паролі будуть згенеровані автоматично та надіслані після завершення (приблизно 10-15 хвилин).\"\n- STEP 3 (execute): right after the Step 2 message, produce STRICTLY valid JSON with no extra text.\nFormat: {\"action\": \"deploy\", \"project_name\": \"...\", \"manager_username\": \"...\", \"email\": \"...\", \"server_type\": \"...\"}\n\nSCENARIO 2: INFRASTRUCTURE MANAGEMENT (tools hetzner_manager and hetzner_extended)\nWhen the user asks for an operation on existing servers, use hetzner_manager (main operations) or hetzner_extended (info, metrics, cost report, rename, reset, rebuild, rescue, protect, SSH keys, create a new server from a snapshot).\n\nhetzner_manager commands (parameter query):\n- list_servers: list all servers.\n- poweroff / poweron / reboot: power control (needs the server identifier).\n- delete_server: FULL removal of the server and its DNS records. CRITICAL: before calling, ALWAYS ask the user in ONE message: \"Ви впевнені, що хочете безповоротно видалити проєкт [Назва]? Разом із сервером у Hetzner видаляються й його автоматичні бекапи. Рекомендую спочатку зробити снепшот (5-15 хв). Відповідь «так» — видалити зі снепшотом (рекомендовано), «так без снепшота» — одразу.\" By default call delete_server (with snapshot); call delete_server_no_snapshot only if the user explicitly declines the snapshot.\n- list_types: show available server types with prices.\n- change_type <server> <new_type>: change the server type. The tool powers the server off and on again by itself and takes an automatic snapshot first, so do NOT ask the user to power it off.\n- create_snapshot: create a backup (needs the server identifier).\n- list_snapshots: show backups of a server (without identifier: all servers).\n- delete_snapshot: delete a backup (identifier = snapshot ID).\n\nCONSTRAINTS:\n1. Do not invent data. If you do not know an ID or exact name, call list_servers or list_snapshots first.\n2. Pass tool results to the user verbatim (see rule 6); only add a short Ukrainian comment when it helps.\n3. If a tool returns an error, explain it in plain Ukrainian and suggest a solution.\n4. Firewalls, volumes and floating IPs are not supported: if asked, say that the bot cannot do it."
+          "systemMessage": "You are a DevOps AI agent responsible for deploying and managing CVAT infrastructure on Hetzner. Be precise, careful and always follow the rules below.\n\nLANGUAGE: Always reply to the user in Ukrainian. Never use the word \"action\" in a normal reply (it is reserved for the deploy JSON).\n\nGLOBAL RULES:\n1. NAMING: all server and DNS names ALWAYS start with the prefix \"cvat-\" followed by the project name in Latin letters (e.g. cvat-demo). When the user gives a project name, use only the part after \"cvat-\" as project_name.\n2. NEW PROJECTS START CLEAN: when the user asks for a NEW server, you are STRICTLY FORBIDDEN to reuse parameters or logins from earlier messages. Start collecting data from scratch.\n3. NO HALLUCINATIONS: never invent parameters.\n4. TOOL ERRORS: if a tool failed earlier in the conversation, and the user asks again, call the tool again. Never claim that a function is broken or unavailable without calling it first.\n5. A service message that starts with [СЕРВІС] is not a user request: just confirm briefly in Ukrainian that you are ready.\n6. TOOL RESULTS ARE FINAL TEXT: when a tool returns a ready, formatted message (lists of servers, tariffs, snapshots, reports, metrics, server info, confirmation questions), pass it to the user VERBATIM. Never shorten it, never drop, merge or reorder lines, never add numbers you did not receive.\n7. LONG OPERATIONS: a delete with a snapshot or a type change takes up to 20 minutes and the tool itself notifies the user when it starts. Never repeat such a command while it is running.\n8. DELETING SERVERS: you never decide yourself whether a deletion is confirmed. When the user asks to delete a server, call hetzner_manager with query=delete_server. The tool asks the user to confirm and decides from the user's exact reply. When the user replies to that question, call the tool again with the same server name. Never say that a server was deleted unless the tool's result says so.\n\nSCENARIO 1: DEPLOY CVAT\nTo start a deploy you MUST collect 4 parameters:\n1. project_name: project name (Latin letters, no spaces, without the cvat- prefix).\n2. manager_username: CVAT project manager login (Project_Manager_Login).\n3. email: contact email for SSL certificates.\n4. server_type: Hetzner server type (e.g. cpx31).\nUsers sp and ir get SSH access to every new server automatically. Do NOT ask for them.\n\nDEPLOY ALGORITHM (CRITICAL):\n- STEP 1 (collect): if any of the 4 parameters is missing, reply with PLAIN TEXT in Ukrainian: politely list exactly which parameters are missing and ask for them. NO JSON AT THIS STEP.\n- STEP 2 (confirm): only when ALL 4 parameters are explicitly collected, write exactly: \"Усі необхідні дані зібрано. Деплой розпочато. Паролі будуть згенеровані автоматично та надіслані після завершення (приблизно 10-15 хвилин).\"\n- STEP 3 (execute): right after the Step 2 message, produce STRICTLY valid JSON with no extra text.\nFormat: {\"action\": \"deploy\", \"project_name\": \"...\", \"manager_username\": \"...\", \"email\": \"...\", \"server_type\": \"...\"}\n\nSCENARIO 2: INFRASTRUCTURE MANAGEMENT (tools hetzner_manager and hetzner_extended)\nWhen the user asks for an operation on existing servers, use hetzner_manager (main operations) or hetzner_extended (info, metrics, cost report, rename, reset, rebuild, rescue, protect, SSH keys).\n\nhetzner_manager commands (parameter query):\n- list_servers: list all servers.\n- poweroff / poweron / reboot: power control (needs the server identifier).\n- delete_server: FULL removal of the server and its DNS records (confirmation is handled by the tool, see rule 8).\n- list_types: show available server types with prices.\n- change_type <server> <new_type>: change the server type. The tool powers the server off and on again by itself and takes an automatic snapshot first, so do NOT ask the user to power it off.\n- create_snapshot: create a backup (needs the server identifier).\n- list_snapshots: show backups of a server (without identifier: all servers).\n- delete_snapshot: delete a backup (identifier = snapshot ID).\n\nCONSTRAINTS:\n1. Do not invent data. If you do not know an ID or exact name, call list_servers or list_snapshots first.\n2. Pass tool results to the user verbatim (see rule 6); only add a short Ukrainian comment when it helps.\n3. If a tool returns an error, explain it in plain Ukrainian and suggest a solution.\n4. Firewalls, volumes and floating IPs are not supported: if asked, say that the bot cannot do it."
         }
       },
       "type": "@n8n/n8n-nodes-langchain.agent",
@@ -183,18 +183,20 @@
     },
     {
       "parameters": {
-        "description": "Tool for managing Hetzner infrastructure. Always wait for the tool result before replying to the user.\n\nParameters:\n1. query (string, required): the command name. Allowed values:\n- list_servers (list servers)\n- list_types (list server types with prices)\n- poweroff, poweron, reboot (power control)\n- create_snapshot, list_snapshots, delete_snapshot (backups)\n- delete_server: delete the server WITH a snapshot taken first (recommended, default)\n- delete_server_no_snapshot: delete WITHOUT a snapshot; call ONLY if the user EXPLICITLY said without snapshot\n- change_type <server_name> <new_type> (EXCEPTION: for a type change, query MUST contain three words, e.g. \"change_type cvat-demo cpx31\"). The tool takes an automatic snapshot, powers the server off, changes the type and powers it on. Do not ask the user to power it off.\n\nDELETING A SERVER: before calling, ASK the user in ONE message: \"Видалити cvat-X безповоротно? Разом із сервером в Hetzner видаляються й його автоматичні бекапи. Рекомендую спочатку зробити снепшот (це займає 5–15 хв). Відповідь: «так» — видалити зі снепшотом (рекомендовано), «так без снепшота» — видалити одразу». If the user answered \"так\": query=delete_server; if \"без снепшота\": query=delete_server_no_snapshot. In both cases identifier = the full server name. With a snapshot the operation takes longer (up to 20 minutes).\n\n2. identifier (string, optional): exact server name (always with the cvat- prefix, e.g. cvat-demo), IP address or ID.\n- For list_servers, list_types and change_type leave it empty (it is ignored).\n- For list_snapshots the identifier is OPTIONAL: if no server is given or the user wants backups of all servers, call without identifier. Never ask for the server name for this command.\n- For delete_snapshot pass ONLY the snapshot ID (digits).\n- For the other commands (poweroff, poweron, reboot, create_snapshot, delete_server, delete_server_no_snapshot) you MUST pass the full server name.\n\nIf a tool call failed earlier in the conversation, call it again when the user asks again.",
+        "description": "Tool for managing Hetzner infrastructure. Always wait for the tool result before replying to the user.\n\nParameters:\n1. query (string, required): the command name. Allowed values:\n- list_servers (list servers)\n- list_types (list server types with prices)\n- poweroff, poweron, reboot (power control)\n- create_snapshot, list_snapshots, delete_snapshot (backups)\n- delete_server (delete a server; see DELETING below)\n- change_type <server_name> <new_type> (EXCEPTION: for a type change, query MUST contain three words, e.g. \"change_type cvat-demo cpx31\"). The tool takes an automatic snapshot, powers the server off, changes the type and powers it on. Do not ask the user to power it off.\n\nDELETING A SERVER: the tool itself runs the confirmation protocol, you do NOT ask for confirmation yourself. Call query=delete_server with identifier = the full server name as soon as the user asks to delete a server. The tool replies with a confirmation question: pass it to the user VERBATIM and stop. When the user answers, call query=delete_server again with the same identifier: the tool reads the user's exact words and decides itself whether to delete with or without a snapshot (it ignores which query variant you pick). If the tool says the answer was not understood, pass that message on. NEVER tell the user that a server was deleted unless the tool's result says so. With a snapshot the operation takes up to 20 minutes and the tool itself notifies the user when the snapshot starts: do not repeat the command while it runs.\n\n2. identifier (string, optional): exact server name (always with the cvat- prefix, e.g. cvat-demo), IP address or ID.\n- For list_servers, list_types and change_type leave it empty (it is ignored).\n- For list_snapshots the identifier is OPTIONAL: if no server is given or the user wants backups of all servers, call without identifier. Never ask for the server name for this command.\n- For delete_snapshot pass ONLY the snapshot ID (digits).\n- For the other commands (poweroff, poweron, reboot, create_snapshot, delete_server) you MUST pass the full server name.\n\nIf a tool call failed earlier in the conversation, call it again when the user asks again.",
         "workflowId": {
           "__rl": true,
           "value": "<SUBWORKFLOW_ID>",
           "mode": "list",
-          "cachedResultName": "Tool: Hetzner Unified"
+          "cachedResultName": "CVAT-BOT | Інструмент: Hetzner (основний)"
         },
         "workflowInputs": {
           "mappingMode": "defineBelow",
           "value": {
             "query": "={{ $fromAI('query', 'Command as a plain string, e.g. list_servers, list_types, poweroff, poweron, reboot, create_snapshot, list_snapshots, delete_snapshot, delete_server, or change_type <server> <new_type>', 'string') }}",
-            "identifier": "={{ $fromAI('identifier', 'Exact server name (cvat-...), IP or ID; for delete_snapshot only the snapshot ID. Empty string if not needed', 'string', '') }}"
+            "identifier": "={{ $fromAI('identifier', 'Exact server name (cvat-...), IP or ID; for delete_snapshot only the snapshot ID. Empty string if not needed', 'string', '') }}",
+            "chat_space": "={{ $('Вебхук: повідомлення з чату').first().json.body.chat.messagePayload.space.name }}",
+            "chat_text": "={{ $('Вебхук: повідомлення з чату').first().json.body.chat.messagePayload.message.text }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -215,6 +217,24 @@
               "display": true,
               "canBeUsedToMatch": true,
               "type": "string"
+            },
+            {
+              "id": "chat_space",
+              "displayName": "chat_space",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "chat_text",
+              "displayName": "chat_text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
             }
           ],
           "attemptToConvertTypes": false,
@@ -224,8 +244,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        1736,
-        88
+        1744,
+        96
       ],
       "id": "7cfc779e-bbbf-42f6-afe4-f15f436ef0df",
       "name": "hetzner_manager"
@@ -238,8 +258,8 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
       "typeVersion": 1,
       "position": [
-        1480,
-        88
+        1488,
+        96
       ],
       "id": "dec4a298-3915-46cf-9115-2fd047fbcd80",
       "name": "Модель Gemini",
@@ -310,8 +330,8 @@
       "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
       "typeVersion": 1.3,
       "position": [
-        1608,
-        88
+        1616,
+        96
       ]
     },
     {
@@ -435,7 +455,7 @@
           "__rl": true,
           "value": "<SUBWORKFLOW_ID>",
           "mode": "list",
-          "cachedResultName": "Tool: Hetzner Extended"
+          "cachedResultName": "CVAT-BOT | Інструмент: Hetzner (розширений)"
         },
         "workflowInputs": {
           "mappingMode": "defineBelow",
@@ -503,8 +523,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        1864,
-        88
+        1872,
+        96
       ]
     },
     {
@@ -696,7 +716,7 @@
       "typeVersion": 2.2,
       "position": [
         2288,
-        -64
+        0
       ]
     },
     {

@@ -25,6 +25,12 @@
             },
             {
               "name": "identifier"
+            },
+            {
+              "name": "chat_space"
+            },
+            {
+              "name": "chat_text"
             }
           ]
         }
@@ -1531,6 +1537,205 @@
         224,
         288
       ]
+    },
+    {
+      "id": "b677b8f3-f8bc-4e58-bae4-8288fe282fcc",
+      "name": "Чат: снепшот перед видаленням",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        560,
+        840
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://chat.googleapis.com/v1/{{ $('Вхід: команда з агента').first().json.chat_space }}/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleApi",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "={{ '📸 Створюю снепшот сервера ' + $json.name + ' перед видаленням. Зазвичай це 5–20 хвилин, для великих дисків більше. Після готовності сервер буде видалено, і я напишу про результат. Не відправляйте цю ж команду ще раз, поки вона виконується.' }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleApi": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Google Service Account CVAT_BOT"
+        }
+      }
+    },
+    {
+      "id": "23523fa4-aa09-41c8-ba1f-3b14573427f4",
+      "name": "Hetzner: сервер ще існує?",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1008,
+        1060
+      ],
+      "parameters": {
+        "url": "={{ 'https://api.hetzner.cloud/v1/servers/' + $('Визначити сервер і дію').first().json.id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {}
+      },
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Hetzner Cloud"
+        }
+      }
+    },
+    {
+      "id": "01f2e8cb-eb04-440f-822d-8ad6033111a6",
+      "name": "Сервер ще є?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1120,
+        1060
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "srv-exists",
+              "leftValue": "={{ !!$json.server }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "4682f76f-b906-48ca-b253-c3318f6df3cb",
+      "name": "Відповідь: сервер уже видалено",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1232,
+        1140
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const name = $('Визначити сервер і дію').first().json.name;\nlet snap = '';\ntry { snap = $('Автоснепшот: перед видаленням').first().json.snapshot_id || ''; } catch (e) {}\nlet msg = 'ℹ️ Сервер ' + name + ' вже видалено (іншою командою), поки створювався снепшот. Цей запит нічого не змінював.';\nif (snap) msg += ' Снепшот (ID ' + snap + ') залишився в Hetzner; якщо він не потрібен, напишіть «видали снепшот ' + snap + '».';\nreturn { success: true, message: msg, output: msg };"
+      }
+    },
+    {
+      "id": "b664ee42-06ef-416e-8b8a-339651f09a07",
+      "name": "Чат: снепшот перед зміною тарифу",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        560,
+        1128
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://chat.googleapis.com/v1/{{ $('Вхід: команда з агента').first().json.chat_space }}/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleApi",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "={{ '📸 Створюю снепшот сервера ' + $json.name + ' перед зміною тарифу на ' + $json.newType + '. Зазвичай це 5–20 хвилин. Після готовності вимкну сервер, зміню тариф і увімкну назад. Не надсилайте цю ж команду ще раз, поки вона виконується.' }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleApi": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Google Service Account CVAT_BOT"
+        }
+      }
+    },
+    {
+      "id": "cb5f9975-1a71-416c-a7fa-812c8de17750",
+      "name": "Підтвердження видалення",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        1000
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Підтвердження видалення перевіряється тут, у коді, за дослівним текстом відповіді користувача, а не за рішенням моделі.\nconst sd = $getWorkflowStaticData('global');\nsd.pendingDeletes = sd.pendingDeletes || {};\nconst inp = $('Вхід: команда з агента').first().json;\nconst space = String(inp.chat_space || 'unknown');\nconst raw = String(inp.chat_text || '').toLowerCase();\nconst item = $input.first().json;\nconst name = item.name;\nconst key = space + '|' + name;\nconst now = Date.now();\nfor (const k of Object.keys(sd.pendingDeletes)) {\n  if (now - sd.pendingDeletes[k].ts > 15 * 60 * 1000) delete sd.pendingDeletes[k];\n}\nconst pend = sd.pendingDeletes[key];\nconst ask = (variant) => variant === 'nosnap'\n  ? 'Видалити ' + name + ' БЕЗ снепшота (ви вказали, що дані не потрібні)? Це безповоротно. Відповідь: «так» — видалити одразу, «зі снепшотом» — спочатку зробити снепшот, «ні» — скасувати.'\n  : 'Видалити ' + name + ' безповоротно? Разом із сервером в Hetzner видаляються й його автоматичні бекапи. Рекомендую спочатку зробити снепшот (5–20 хв). Відповідь: «так» — видалити зі снепшотом (рекомендовано), «так без снепшота» — видалити одразу, «ні» — скасувати.';\nconst reply = (m) => [{ json: { needConfirm: true, success: true, message: m, output: m } }];\n\nif (!pend) {\n  const hintNoSnap = /без\\s+сн[еа]пшот|дані\\s+не\\s+(потрібн|потребують)|не\\s+потребують\\s+збереження/.test(raw);\n  const variant = hintNoSnap ? 'nosnap' : 'snap';\n  sd.pendingDeletes[key] = { ts: now, variant: variant };\n  return reply(ask(variant));\n}\n\nconst clean = raw.replace(/[«»\"'`.,!?;:]+/g, ' ').replace(/\\s+/g, ' ').trim();\nif (/^(ні|нет|no|скасуй|скасувати|скасуй видалення|відміна|стоп|stop)$/.test(clean)) {\n  delete sd.pendingDeletes[key];\n  return reply('Видалення ' + name + ' скасовано. Сервер не змінено.');\n}\nlet choice = null;\nif (/^(так )?(видали )?(його )?без сн[еа]пшота$/.test(clean)) choice = 'nosnap';\nelse if (/^(так )?(видали )?(його )?(зі|з|со) сн[еа]пшот(ом)?$/.test(clean)) choice = 'snap';\nelse if (/^(так|yes)$/.test(clean)) choice = pend.variant === 'nosnap' ? 'nosnap' : 'snap';\n\nif (!choice) {\n  const m = pend.variant === 'nosnap'\n    ? '⚠️ Не зрозумів відповідь. Сервер ' + name + ' поки не видалено. Напишіть чітко: «так» (видалити БЕЗ снепшота), «зі снепшотом» або «ні».'\n    : '⚠️ Не зрозумів відповідь. Сервер ' + name + ' поки не видалено. Напишіть чітко: «так» (видалити зі снепшотом), «так без снепшота» або «ні».';\n  return reply(m);\n}\n\ndelete sd.pendingDeletes[key];\nreturn [{ json: Object.assign({}, item, { needConfirm: false, skipSnapshot: choice === 'nosnap' }) }];"
+      }
+    },
+    {
+      "id": "bc7afda0-5ea1-4e0b-b425-3cf0ef8f58ba",
+      "name": "Потрібне підтвердження?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        560,
+        1000
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "need-confirm",
+              "leftValue": "={{ $json.needConfirm === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "64b4b972-c6e5-4b2e-83e1-9e23694b2a4d",
+      "name": "Відповідь: потрібне підтвердження",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        920
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{ json: { success: true, message: $json.message, output: $json.message } }];"
+      }
     }
   ],
   "connections": {
@@ -1691,12 +1896,17 @@
         ],
         [
           {
-            "node": "Видалити без снепшота?",
+            "node": "Підтвердження видалення",
             "type": "main",
             "index": 0
           }
         ],
         [
+          {
+            "node": "Чат: снепшот перед зміною тарифу",
+            "type": "main",
+            "index": 0
+          },
           {
             "node": "Автоснепшот: перед зміною тарифу",
             "type": "main",
@@ -1943,7 +2153,7 @@
       "main": [
         [
           {
-            "node": "Hetzner: видалити сервер",
+            "node": "Hetzner: сервер ще існує?",
             "type": "main",
             "index": 0
           }
@@ -1997,6 +2207,11 @@
         ],
         [
           {
+            "node": "Чат: снепшот перед видаленням",
+            "type": "main",
+            "index": 0
+          },
+          {
             "node": "Автоснепшот: перед видаленням",
             "type": "main",
             "index": 0
@@ -2009,6 +2224,64 @@
         [
           {
             "node": "Відповідь: список тарифів",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hetzner: сервер ще існує?": {
+      "main": [
+        [
+          {
+            "node": "Сервер ще є?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Сервер ще є?": {
+      "main": [
+        [
+          {
+            "node": "Hetzner: видалити сервер",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Відповідь: сервер уже видалено",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Підтвердження видалення": {
+      "main": [
+        [
+          {
+            "node": "Потрібне підтвердження?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Потрібне підтвердження?": {
+      "main": [
+        [
+          {
+            "node": "Відповідь: потрібне підтвердження",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Видалити без снепшота?",
             "type": "main",
             "index": 0
           }
