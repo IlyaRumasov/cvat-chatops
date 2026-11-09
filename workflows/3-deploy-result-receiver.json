@@ -51,6 +51,15 @@
       "name": "Установка успішна?"
     },
     {
+      "id": "0ed781e4-d135-47bc-b12e-27db4c129a0f",
+      "name": "Чат: надіслати доступи",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "onError": "continueRegularOutput",
+      "position": [
+        1120,
+        -272
+      ],
       "parameters": {
         "method": "POST",
         "url": "=https://chat.googleapis.com/v1/{{ $('Вебхук: результат встановлення').first().json.body.chat_space }}/messages",
@@ -61,29 +70,29 @@
           "parameters": [
             {
               "name": "text",
-              "value": "=✅ *Проєкт {{ $('Вебхук: результат встановлення').first().json.body.server_name }} успішно розгорнуто!*\n\n🌐 *URL:* {{ $('Вебхук: результат встановлення').first().json.body.url }}\n🖥 *IP-адреса:* {{ $('Вебхук: результат встановлення').first().json.body.ip }}\n\n🛠 *SSH (доступ лише з офісних IP):*\n👤 *admin1* / 🔑 {{ $('Вебхук: результат встановлення').first().json.body.admin1_password }}\n👤 *admin2* (також вхід за ключем) / 🔑 {{ $('Вебхук: результат встановлення').first().json.body.admin2_password }}\n(root — лише за SSH-ключем)\n\n⚙️ *CVAT (Головний адміністратор):*\n👤 {{ $('Вебхук: результат встановлення').first().json.body.cvat_superuser }} / 🔑 {{ $('Вебхук: результат встановлення').first().json.body.cvat_superuser_password }}\n\n👥 *CVAT (Менеджер проєкту):*\n👤 {{ $('Вебхук: результат встановлення').first().json.body.manager_username }} / 🔑 {{ $('Вебхук: результат встановлення').first().json.body.manager_password }}\n\n⚠️ Збережіть паролі зараз: більше вони ніде не зберігаються."
+              "value": "=✅ *Проєкт {{ $('Вебхук: результат встановлення').first().json.body.server_name }} успішно розгорнуто!*\n\n🌐 *URL:* {{ $('Вебхук: результат встановлення').first().json.body.url }}\n🖥 *IP-адреса:* {{ $('Вебхук: результат встановлення').first().json.body.ip }}\n\n🛠 *SSH (доступ лише з офісних IP):*\n👤 *sp* / 🔑 {{ $('Вебхук: результат встановлення').first().json.body.sp_password }}\n👤 *ir* (також вхід за ключем) / 🔑 {{ $('Вебхук: результат встановлення').first().json.body.ir_password }}\n(root — лише за SSH-ключем)\n\n⚙️ *CVAT (Головний адміністратор):*\n👤 {{ $('Вебхук: результат встановлення').first().json.body.cvat_superuser }} / 🔑 {{ $('Вебхук: результат встановлення').first().json.body.cvat_superuser_password }}\n\n👥 *CVAT (Менеджер проєкту):*\n👤 {{ $('Вебхук: результат встановлення').first().json.body.manager_username }} / 🔑 {{ $('Вебхук: результат встановлення').first().json.body.manager_password }}\n\n⚠️ Збережіть паролі зараз: більше вони ніде не зберігаються."
             }
           ]
         },
         "options": {}
       },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.3,
-      "position": [
-        448,
-        -272
-      ],
-      "id": "0ed781e4-d135-47bc-b12e-27db4c129a0f",
-      "name": "Чат: надіслати доступи",
       "credentials": {
         "googleApi": {
           "id": "<CREDENTIAL_ID>",
           "name": "Google Service Account CVAT_BOT"
         }
-      },
-      "onError": "continueRegularOutput"
+      }
     },
     {
+      "id": "b45161d9-b8b5-433e-ad82-d1ce7b1543e3",
+      "name": "Чат: повідомити про збій",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "onError": "continueRegularOutput",
+      "position": [
+        1120,
+        -80
+      ],
       "parameters": {
         "method": "POST",
         "url": "=https://chat.googleapis.com/v1/{{ $('Вебхук: результат встановлення').first().json.body.chat_space }}/messages",
@@ -100,21 +109,12 @@
         },
         "options": {}
       },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.3,
-      "position": [
-        448,
-        -80
-      ],
-      "id": "b45161d9-b8b5-433e-ad82-d1ce7b1543e3",
-      "name": "Чат: повідомити про збій",
       "credentials": {
         "googleApi": {
           "id": "<CREDENTIAL_ID>",
           "name": "Google Service Account CVAT_BOT"
         }
-      },
-      "onError": "continueRegularOutput"
+      }
     },
     {
       "parameters": {
@@ -263,6 +263,219 @@
         224,
         -80
       ]
+    },
+    {
+      "id": "9dc0a8d9-db92-41d6-95e6-0ca590e39fe1",
+      "name": "Заявка? (успіх)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        448,
+        -272
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "84dbfe05-c3fc-434c-8bb7-9b19bcea75b2",
+              "leftValue": "={{ String($('Вебхук: результат встановлення').first().json.body.chat_space || '') }}",
+              "rightValue": "ticket-",
+              "operator": {
+                "type": "string",
+                "operation": "startsWith"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "3de51d64-7b25-44fd-9d08-36b1cf09d4ce",
+      "name": "Заявка? (збій)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        448,
+        -80
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "9a770c32-7391-478a-8981-91a939f7438f",
+              "leftValue": "={{ String($('Вебхук: результат встановлення').first().json.body.chat_space || '') }}",
+              "rightValue": "ticket-",
+              "operator": {
+                "type": "string",
+                "operation": "startsWith"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "14380dfa-bb77-4521-b353-fa930722d925",
+      "name": "Лист: адміністраторам (доступи)",
+      "webhookId": "c86f13ad-e915-4cf0-93a8-01be5f8cdc96",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "retryOnFail": true,
+      "maxTries": 4,
+      "waitBetweenTries": 20000,
+      "onError": "continueRegularOutput",
+      "position": [
+        672,
+        -400
+      ],
+      "parameters": {
+        "fromEmail": "it-noreply@example.com",
+        "toEmail": "admin1@example.com, admin2@example.com",
+        "subject": "=🆕 CVAT {{ $('Вебхук: результат встановлення').first().json.body.server_name }}: сервер розгорнуто (заявка #{{ String($('Вебхук: результат встановлення').first().json.body.chat_space).replace('ticket-', '') }})",
+        "emailFormat": "text",
+        "text": "=Сервер {{ $('Вебхук: результат встановлення').first().json.body.server_name }} розгорнуто за заявкою #{{ String($('Вебхук: результат встановлення').first().json.body.chat_space).replace('ticket-', '') }}.\n\nURL: {{ $('Вебхук: результат встановлення').first().json.body.url }}\nIP: {{ $('Вебхук: результат встановлення').first().json.body.ip }}\n\nSSH (доступ лише з офісних IP):\n  sp / {{ $('Вебхук: результат встановлення').first().json.body.sp_password }}\n  ir / {{ $('Вебхук: результат встановлення').first().json.body.ir_password }} (також вхід за ключем)\n  root: лише за SSH-ключем\n\nCVAT (Головний адміністратор): {{ $('Вебхук: результат встановлення').first().json.body.cvat_superuser }} / {{ $('Вебхук: результат встановлення').first().json.body.cvat_superuser_password }}\nCVAT (Менеджер проєкту): {{ $('Вебхук: результат встановлення').first().json.body.manager_username }} / {{ $('Вебхук: результат встановлення').first().json.body.manager_password }}\n\nАвтор заявки ({{ $('Вебхук: результат встановлення').first().json.body.email }}) отримав окремий лист лише з URL і доступом менеджера проєкту.\nПаролі більше ніде не зберігаються: збережіть їх у менеджері паролів.",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "credentials": {
+        "smtp": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "SMTP Google relay"
+        }
+      }
+    },
+    {
+      "id": "9210443e-58d3-4423-a029-5256f60fc98c",
+      "name": "Лист: автору (доступи менеджера)",
+      "webhookId": "96fcfbb3-db2c-4bae-be93-34c153f6f9b9",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "retryOnFail": true,
+      "maxTries": 4,
+      "waitBetweenTries": 20000,
+      "onError": "continueRegularOutput",
+      "position": [
+        896,
+        -400
+      ],
+      "parameters": {
+        "fromEmail": "it-noreply@example.com",
+        "toEmail": "={{ $('Вебхук: результат встановлення').first().json.body.email }}",
+        "subject": "=CVAT для вашого проєкту готовий (заявка #{{ String($('Вебхук: результат встановлення').first().json.body.chat_space).replace('ticket-', '') }})",
+        "emailFormat": "text",
+        "text": "=Доброго дня!\n\nCVAT для проєкту розгорнуто (заявка #{{ String($('Вебхук: результат встановлення').first().json.body.chat_space).replace('ticket-', '') }}).\n\nАдреса: {{ $('Вебхук: результат встановлення').first().json.body.url }}\nЛогін: {{ $('Вебхук: результат встановлення').first().json.body.manager_username }}\nПароль: {{ $('Вебхук: результат встановлення').first().json.body.manager_password }}\n\nЗбережіть пароль у менеджері паролів: повторно він не надсилається. Якщо вхід не вдається, дайте відповідь у заявці.\n\nIT-підтримка",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "credentials": {
+        "smtp": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "SMTP Google relay"
+        }
+      }
+    },
+    {
+      "id": "ed938de5-78bc-4b40-b4b5-7acf5d55558e",
+      "name": "Заявка: нотатка (успіх)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "onError": "continueRegularOutput",
+      "position": [
+        1120,
+        -400
+      ],
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://redmine.example.com/issues/{{ String($('Вебхук: результат встановлення').first().json.body.chat_space).replace('ticket-', '') }}.json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({issue: {notes: 'CVAT розгорнуто: ' + $('Вебхук: результат встановлення').first().json.body.url + '. Доступи менеджера проєкту надіслано листом на пошту автора заявки.', status_id: 17}}) }}",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Redmine HTTP header auth"
+        }
+      }
+    },
+    {
+      "id": "4249d444-f85b-4ade-a6d3-eb8ad9eece17",
+      "name": "Лист: адміністраторам (збій)",
+      "webhookId": "57ceb86c-239b-4aec-ac4c-068b569bc3b3",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "retryOnFail": true,
+      "maxTries": 4,
+      "waitBetweenTries": 20000,
+      "onError": "continueRegularOutput",
+      "position": [
+        672,
+        100
+      ],
+      "parameters": {
+        "fromEmail": "it-noreply@example.com",
+        "toEmail": "admin1@example.com, admin2@example.com",
+        "subject": "=⚠️ CVAT {{ $('Вебхук: результат встановлення').first().json.body.server_name }}: деплой не вдався (заявка #{{ String($('Вебхук: результат встановлення').first().json.body.chat_space).replace('ticket-', '') }})",
+        "emailFormat": "text",
+        "text": "=Деплой {{ $('Вебхук: результат встановлення').first().json.body.server_name }} (заявка #{{ String($('Вебхук: результат встановлення').first().json.body.chat_space).replace('ticket-', '') }}) не завершився.\n\nПричина: {{ $('Вебхук: результат встановлення').first().json.body.message }}\n\nСервер у стані Failed у таблиці. Перевірте його в Hetzner, за потреби видаліть і повторіть.",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "credentials": {
+        "smtp": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "SMTP Google relay"
+        }
+      }
+    },
+    {
+      "id": "679cbbdd-33e8-44b6-803d-1a655f57b2a4",
+      "name": "Заявка: нотатка (збій)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "onError": "continueRegularOutput",
+      "position": [
+        896,
+        100
+      ],
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://redmine.example.com/issues/{{ String($('Вебхук: результат встановлення').first().json.body.chat_space).replace('ticket-', '') }}.json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({issue: {notes: 'Автоматичний деплой CVAT не завершився. Деталі надіслано адміністраторам листом.', private_notes: true}}) }}",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Redmine HTTP header auth"
+        }
+      }
     }
   ],
   "connections": {
@@ -310,7 +523,7 @@
       "main": [
         [
           {
-            "node": "Чат: надіслати доступи",
+            "node": "Заявка? (успіх)",
             "type": "main",
             "index": 0
           }
@@ -321,7 +534,76 @@
       "main": [
         [
           {
+            "node": "Заявка? (збій)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Заявка? (успіх)": {
+      "main": [
+        [
+          {
+            "node": "Лист: адміністраторам (доступи)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Чат: надіслати доступи",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Заявка? (збій)": {
+      "main": [
+        [
+          {
+            "node": "Лист: адміністраторам (збій)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "Чат: повідомити про збій",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Лист: адміністраторам (доступи)": {
+      "main": [
+        [
+          {
+            "node": "Лист: автору (доступи менеджера)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Лист: автору (доступи менеджера)": {
+      "main": [
+        [
+          {
+            "node": "Заявка: нотатка (успіх)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Лист: адміністраторам (збій)": {
+      "main": [
+        [
+          {
+            "node": "Заявка: нотатка (збій)",
             "type": "main",
             "index": 0
           }

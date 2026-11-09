@@ -1543,6 +1543,7 @@
       "name": "Чат: снепшот перед видаленням",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
+      "onError": "continueRegularOutput",
       "position": [
         560,
         840
@@ -1646,6 +1647,7 @@
       "name": "Чат: снепшот перед зміною тарифу",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
+      "onError": "continueRegularOutput",
       "position": [
         560,
         1128

@@ -477,6 +477,15 @@
       ]
     },
     {
+      "id": "63f99521-4f81-4e98-a062-4fd37c5c03be",
+      "name": "Чат: таймаут інсталяції",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "onError": "continueRegularOutput",
+      "position": [
+        1808,
+        640
+      ],
       "parameters": {
         "method": "POST",
         "url": "=https://chat.googleapis.com/v1/{{ $json.notify_space }}/messages",
@@ -493,14 +502,6 @@
         },
         "options": {}
       },
-      "id": "63f99521-4f81-4e98-a062-4fd37c5c03be",
-      "name": "Чат: таймаут інсталяції",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.3,
-      "position": [
-        1584,
-        592
-      ],
       "credentials": {
         "googleApi": {
           "id": "<CREDENTIAL_ID>",
@@ -522,6 +523,97 @@
         208,
         32
       ]
+    },
+    {
+      "id": "35cf4b9b-bff0-4fc4-b830-a968f8fa4512",
+      "name": "Заявка? (таймаут)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1584,
+        592
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "20664e48-cd87-4a62-a8b4-937cb1865ce6",
+              "leftValue": "={{ String($json.notify_space || '') }}",
+              "rightValue": "ticket-",
+              "operator": {
+                "type": "string",
+                "operation": "startsWith"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "07221cbc-e7ec-4fc6-832d-126b4e765149",
+      "name": "Лист: адміністраторам (таймаут)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "retryOnFail": true,
+      "maxTries": 4,
+      "waitBetweenTries": 20000,
+      "onError": "continueRegularOutput",
+      "position": [
+        1808,
+        520
+      ],
+      "parameters": {
+        "fromEmail": "it-noreply@example.com",
+        "toEmail": "admin1@example.com, admin2@example.com",
+        "subject": "=⚠️ CVAT: установка не завершилась (заявка #{{ String($json.notify_space).replace('ticket-', '') }})",
+        "emailFormat": "text",
+        "text": "={{ $json.notify_text }}\n\nЗаявка #{{ String($json.notify_space).replace('ticket-', '') }}. Перевірте сервер у Hetzner, за потреби видаліть і запустіть розгортання знову.",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "credentials": {
+        "smtp": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "SMTP Google relay"
+        }
+      },
+      "webhookId": "3aa7bea9-b3b2-494b-9807-5db8a6bc2e40"
+    },
+    {
+      "id": "2f4bc0b4-69ea-4772-b62c-85397012545a",
+      "name": "Заявка: нотатка (таймаут)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "onError": "continueRegularOutput",
+      "position": [
+        2032,
+        520
+      ],
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://redmine.example.com/issues/{{ String($json.notify_space).replace('ticket-', '') }}.json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({issue: {notes: 'Автоматичне розгортання CVAT не завершилось вчасно. Деталі надіслано адміністраторам листом.', private_notes: true}}) }}",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Redmine HTTP header auth"
+        }
+      }
     }
   ],
   "connections": {
@@ -618,7 +710,36 @@
       "main": [
         [
           {
+            "node": "Заявка? (таймаут)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Заявка? (таймаут)": {
+      "main": [
+        [
+          {
+            "node": "Лист: адміністраторам (таймаут)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "Чат: таймаут інсталяції",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Лист: адміністраторам (таймаут)": {
+      "main": [
+        [
+          {
+            "node": "Заявка: нотатка (таймаут)",
             "type": "main",
             "index": 0
           }
