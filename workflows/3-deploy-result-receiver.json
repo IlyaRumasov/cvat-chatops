@@ -409,7 +409,7 @@
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({issue: {notes: 'CVAT розгорнуто: ' + $('Вебхук: результат встановлення').first().json.body.url + '. Доступи менеджера проєкту надіслано листом на пошту автора заявки.', status_id: 17}}) }}",
+        "jsonBody": "={{ JSON.stringify({issue: {notes: 'CVAT розгорнуто: ' + $('Вебхук: результат встановлення').first().json.body.url + '. Доступи менеджера проєкту надіслано листом на пошту автора заявки.', status_id: 17, custom_fields: [ { id: 92, value: ['Создание нового сервера/сервиса/ресурса'] } ] } }) }}",
         "options": {}
       },
       "credentials": {
@@ -467,7 +467,7 @@
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({issue: {notes: 'Автоматичний деплой CVAT не завершився. Деталі надіслано адміністраторам листом.', private_notes: true}}) }}",
+        "jsonBody": "={{ JSON.stringify({issue: {notes: 'Автоматичний деплой CVAT не завершився. Деталі надіслано адміністраторам листом.', private_notes: true } }) }}",
         "options": {}
       },
       "credentials": {

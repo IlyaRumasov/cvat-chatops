@@ -605,7 +605,7 @@
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({issue: {notes: 'Автоматичне розгортання CVAT не завершилось вчасно. Деталі надіслано адміністраторам листом.', private_notes: true}}) }}",
+        "jsonBody": "={{ JSON.stringify({issue: {notes: 'Автоматичне розгортання CVAT не завершилось вчасно. Деталі надіслано адміністраторам листом.', private_notes: true } }) }}",
         "options": {}
       },
       "credentials": {
